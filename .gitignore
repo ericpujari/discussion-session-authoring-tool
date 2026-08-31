@@ -1,4 +1,14 @@
 .DS_Store
 node_modules/
 .env
+.env.*
 *.log
+
+# Editor/IDE local settings
+.vscode/
+.idea/
+
+# Local-only notes or config not meant for coworkers
+*.local.md
+*.local.json
+CLAUDE.local.md
