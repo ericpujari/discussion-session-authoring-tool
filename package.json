@@ -1,0 +1,9 @@
+{
+  "name": "discussion-session-authoring-tool",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Serverless backend for the Discussion Session tools (Noun Project icon search proxy).",
+  "dependencies": {
+    "oauth-1.0a": "^2.2.6"
+  }
+}
