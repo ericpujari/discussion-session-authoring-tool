@@ -257,10 +257,16 @@
   .icon-desc-box{display:flex; align-items:center; gap:8px; align-self:stretch;}
   .icon-desc-glyph{
     width:38px; height:38px; border-radius:10px; background:#fff; border:1.5px dashed var(--line); color:#B9AF8E;
-    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;
   }
   .icon-desc-glyph svg{width:20px; height:20px;}
   .icon-desc-glyph img{width:100%; height:100%; object-fit:cover; border-radius:8px;}
+  .icon-desc-clear{
+    position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%; padding:0;
+    background:#fff; border:1.5px solid var(--line); color:var(--ink-soft); font-size:9px; line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .icon-desc-clear:hover{color:#9B3B34; border-color:#9B3B34;}
   .icon-desc-box input[type=text]{font-weight:500; font-style:italic; font-size:13px; flex:1;}
   .btn-icon-search{
     flex-shrink:0; padding:7px 12px; font-size:12px; font-weight:600; border-radius:8px;
@@ -435,35 +441,27 @@
   .guardrail-box summary{color:#fff; font-size:13px; font-weight:600; cursor:pointer;}
   .guardrail-box ul{margin:10px 0 0; padding-left:18px; color:#C7D2DD; font-size:12.5px; line-height:1.7;}
 
-  /* ============ Icon search modal (Noun Project results) ============ */
-  .icon-search-backdrop{
-    position:fixed; inset:0; z-index:600; background:rgba(20,24,30,.55);
-    display:flex; align-items:center; justify-content:center; padding:20px;
+  /* ============ Icon search strip (Noun Project results, inline under an option) ============ */
+  .icon-search-strip{
+    position:relative; background:#F8F8F6; border:1.5px solid var(--line); border-radius:10px;
+    padding:10px 28px 10px 10px; margin-top:-2px;
   }
-  .icon-search-modal{
-    background:#fff; border-radius:14px; width:100%; max-width:480px; max-height:80vh;
-    display:flex; flex-direction:column; padding:20px; box-shadow:0 20px 50px rgba(0,0,0,.35);
+  .icon-search-dismiss{
+    position:absolute; top:6px; right:6px; width:18px; height:18px; border-radius:50%; padding:0;
+    background:#fff; border:1.5px solid var(--line); color:var(--ink-soft); font-size:10px; line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
-  .icon-search-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;}
-  .icon-search-head h3{margin:0; font-size:16px; color:var(--ink);}
-  .icon-search-form{display:flex; gap:8px; margin-bottom:14px;}
-  .icon-search-form input[type=text]{
-    flex:1; padding:9px 11px; border-radius:8px; border:1.5px solid var(--line); font-size:13.5px;
-  }
-  .icon-search-status{color:var(--ink-soft); font-size:13px; padding:20px 0; text-align:center;}
+  .icon-search-dismiss:hover{color:var(--ink); border-color:var(--ink-soft);}
+  .icon-search-status{color:var(--ink-soft); font-size:12.5px; text-align:center; padding:4px 0;}
   .icon-search-error{color:#9B3B34;}
-  .icon-search-results{
-    display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; overflow-y:auto; padding-bottom:4px;
-  }
+  .icon-search-results{display:flex; flex-wrap:wrap; gap:8px;}
   .icon-search-result{
-    aspect-ratio:1; border-radius:8px; border:1.5px solid var(--line); background:#F8F8F6;
-    display:flex; align-items:center; justify-content:center; padding:8px; cursor:pointer;
+    width:44px; height:44px; flex-shrink:0; border-radius:8px; border:1.5px solid var(--line); background:#fff;
+    display:flex; align-items:center; justify-content:center; padding:6px; cursor:pointer;
   }
   .icon-search-result:hover{border-color:var(--ink-soft);}
   .icon-search-result.selected{border-color:var(--ink); background:#EDECE7;}
   .icon-search-result img{width:100%; height:100%; object-fit:contain;}
-  .icon-search-current{display:flex; align-items:center; gap:10px; margin-top:14px; padding-top:14px; border-top:1.5px solid var(--line); font-size:12.5px; color:var(--ink-soft);}
-  .icon-search-current-thumb{width:28px; height:28px; object-fit:contain;}
 
   /* ============ Player Preview (mimics the real Discussion Session screen) ============ */
   .pp-screen{
@@ -678,8 +676,7 @@ var state = {
   ppKind: 'scenario',        // player-preview: which block is being previewed — scenario | halftime | reflection
   ppScenarioIndex: 0,        // player-preview: which of the 6 scenarios
   ppReturnScreen: 'scenario', // player-preview: screen to return to on exit
-  iconSearchOpen: null,      // {scenarioIndex, optionIndex} while the icon search modal is open
-  iconSearchQuery: '',
+  iconSearchOpen: null,      // {scenarioIndex, optionIndex} while an option's inline search strip is showing
   iconSearchResults: [],
   iconSearchLoading: false,
   iconSearchError: ''
@@ -954,7 +951,6 @@ function render(){
   if(state.screen!=='home' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='playerPreview' && state.draft){
     if(AI_ASSISTANT_ENABLED) renderCoachOverlay();
     renderNotesOverlay();
-    if(ICON_SEARCH_ENABLED) renderIconSearchOverlay();
   }
 }
 
@@ -1137,15 +1133,15 @@ function renderStoryboard(){
 }
 
 /* ---------- Scenario editor ---------- */
-function iconGlyphHtml(o){
-  return o.selectedIcon
-    ? '<img class="icon-desc-thumb" src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'
-    : ICON_PLACEHOLDER_SVG;
+function iconGlyphHtml(o, scenarioIdx, optionIdx){
+  if(!o.selectedIcon) return ICON_PLACEHOLDER_SVG;
+  return '<img class="icon-desc-thumb" src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'+
+    '<button type="button" class="icon-desc-clear" data-action="clearIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Remove icon">✕</button>';
 }
-function iconSearchBtnHtml(o, scenarioIdx, optionIdx){
+function iconSearchBtnHtml(scenarioIdx, optionIdx){
   if(!ICON_SEARCH_ENABLED) return '';
-  var attrs = 'data-action="openIconSearch" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Search real icons on the Noun Project"';
-  return '<button type="button" class="btn-icon-search" '+attrs+'>'+(o.selectedIcon ? 'Change icon' : 'Search icons')+'</button>';
+  var attrs = 'data-action="searchIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Search real icons on the Noun Project"';
+  return '<button type="button" class="btn-icon-search" '+attrs+'>Search</button>';
 }
 function renderScenario(){
   var d = state.draft, i = state.scenarioIndex, sc = d.scenarios[i];
@@ -1163,7 +1159,8 @@ function renderScenario(){
         '</div>'+
       '</div>'+
       renderNoteTab(optAttach)+
-      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Describe the icon, e.g. a simple shield">'+iconSearchBtnHtml(o, i, oi)+'</div>'+
+      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an icon, e.g. shield">'+iconSearchBtnHtml(i, oi)+'</div>'+
+      iconSearchStripHtml(o, i, oi)+
       '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Option label">'+
       '<textarea data-bind="option.rationale" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
       '<div class="wc">'+wordCount(o.rationale)+' words</div>'+
@@ -1648,7 +1645,7 @@ function performIconSearch(query){
   state.iconSearchLoading = true;
   state.iconSearchError = '';
   state.iconSearchResults = [];
-  renderIconSearchOverlay();
+  render();
   fetch(ICON_SEARCH_ENDPOINT+'?q='+encodeURIComponent(query))
     .then(function(res){
       if(!res.ok) throw new Error('search-failed');
@@ -1657,27 +1654,19 @@ function performIconSearch(query){
     .then(function(data){
       state.iconSearchLoading = false;
       state.iconSearchResults = (data && Array.isArray(data.results)) ? data.results : [];
-      renderIconSearchOverlay();
+      render();
     })
     .catch(function(){
       state.iconSearchLoading = false;
       state.iconSearchError = "Icon search isn't working right now — try again in a bit.";
-      renderIconSearchOverlay();
+      render();
     });
 }
-function runIconSearchFromInput(){
-  var input = document.getElementById('iconSearchInput');
-  var query = input ? input.value.trim() : '';
-  if(!query) return;
-  state.iconSearchQuery = query;
-  performIconSearch(query);
-}
-function renderIconSearchOverlay(){
-  if(!state.iconSearchOpen){ removeIconSearchOverlay(); return; }
+function iconSearchStripHtml(o, scenarioIdx, optionIdx){
   var loc = state.iconSearchOpen;
-  var opt = state.draft.scenarios[loc.scenarioIndex].options[loc.optionIndex];
+  if(!loc || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
   var resultsHtml = state.iconSearchResults.map(function(icon, idx){
-    var selected = opt.selectedIcon && opt.selectedIcon.id===icon.id;
+    var selected = o.selectedIcon && o.selectedIcon.id===icon.id;
     return '<button type="button" class="icon-search-result'+(selected?' selected':'')+'" data-action="selectIcon" data-idx="'+idx+'" title="'+esc(icon.attributionName||'Noun Project icon')+'"><img src="'+esc(icon.thumbnailUrl)+'" alt=""></button>';
   }).join('');
   var body = state.iconSearchLoading
@@ -1686,39 +1675,8 @@ function renderIconSearchOverlay(){
       ? '<div class="icon-search-status icon-search-error">'+esc(state.iconSearchError)+'</div>'
       : (state.iconSearchResults.length
           ? '<div class="icon-search-results">'+resultsHtml+'</div>'
-          : '<div class="icon-search-status">No icons found yet. Try a simpler word and search.</div>');
-  var html = ''+
-  '<div class="icon-search-backdrop" data-action="closeIconSearch">'+
-    '<div class="icon-search-modal" data-action="iconSearchNoop">'+
-      '<div class="icon-search-head"><h3>Search icons — Option '+(loc.optionIndex+1)+'</h3><button type="button" class="btn-icon" data-action="closeIconSearch">✕</button></div>'+
-      '<div class="icon-search-form"><input type="text" id="iconSearchInput" value="'+esc(state.iconSearchQuery)+'" placeholder="e.g. shield" autocomplete="off"><button type="button" class="btn btn-primary btn-small" data-action="runIconSearch">Search</button></div>'+
-      body+
-      (opt.selectedIcon ? '<div class="icon-search-current"><img class="icon-search-current-thumb" src="'+esc(opt.selectedIcon.thumbnailUrl)+'" alt=""><span>Currently selected</span><button type="button" class="btn-danger-text" data-action="clearIcon">Remove</button></div>' : '')+
-    '</div>'+
-  '</div>';
-  var existing = document.getElementById('iconSearchOverlayRoot');
-  var wrap = existing;
-  var isNew = false;
-  if(!wrap){
-    wrap = document.createElement('div');
-    wrap.id = 'iconSearchOverlayRoot';
-    document.body.appendChild(wrap);
-    isNew = true;
-  }
-  wrap.innerHTML = html;
-  if(isNew){ wrap.addEventListener('click', handleClick); }
-  var input = wrap.querySelector('#iconSearchInput');
-  if(input){
-    input.addEventListener('keydown', function(e){
-      if(e.key==='Enter'){ e.preventDefault(); runIconSearchFromInput(); }
-    });
-    input.focus();
-    input.setSelectionRange(input.value.length, input.value.length);
-  }
-}
-function removeIconSearchOverlay(){
-  var existing = document.getElementById('iconSearchOverlayRoot');
-  if(existing) existing.remove();
+          : '<div class="icon-search-status">No icons found. Try a simpler word.</div>');
+  return '<div class="icon-search-strip"><button type="button" class="icon-search-dismiss" data-action="dismissIconSearch" title="Close">✕</button>'+body+'</div>';
 }
 
 /* ============================= AI COACH CALL ============================= */
@@ -2089,22 +2047,16 @@ function handleClick(e){
     render(); return;
   }
   if(action==='closePlayerPreview'){ state.screen = state.ppReturnScreen || 'storyboard'; render(); return; }
-  if(action==='openIconSearch'){
+  if(action==='searchIcon'){
     var scenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
     var optionIdx = parseInt(t.getAttribute('data-oidx'),10);
-    var opt = state.draft.scenarios[scenarioIdx].options[optionIdx];
+    var query = state.draft.scenarios[scenarioIdx].options[optionIdx].iconDescription.trim();
+    if(!query) return;
     state.iconSearchOpen = {scenarioIndex:scenarioIdx, optionIndex:optionIdx};
-    state.iconSearchQuery = opt.iconDescription.trim();
-    state.iconSearchResults = [];
-    state.iconSearchError = '';
-    state.iconSearchLoading = false;
-    renderIconSearchOverlay();
-    if(state.iconSearchQuery) performIconSearch(state.iconSearchQuery);
+    performIconSearch(query);
     return;
   }
-  if(action==='iconSearchNoop'){ return; }
-  if(action==='closeIconSearch'){ state.iconSearchOpen = null; removeIconSearchOverlay(); return; }
-  if(action==='runIconSearch'){ runIconSearchFromInput(); return; }
+  if(action==='dismissIconSearch'){ state.iconSearchOpen = null; render(); return; }
   if(action==='selectIcon'){
     var iconIdx = parseInt(t.getAttribute('data-idx'),10);
     var icon = state.iconSearchResults[iconIdx];
@@ -2113,16 +2065,15 @@ function handleClick(e){
     state.draft.scenarios[loc.scenarioIndex].options[loc.optionIndex].selectedIcon = icon;
     debounceSave();
     state.iconSearchOpen = null;
-    removeIconSearchOverlay();
     render();
     return;
   }
   if(action==='clearIcon'){
-    if(!state.iconSearchOpen) return;
-    var clearLoc = state.iconSearchOpen;
-    state.draft.scenarios[clearLoc.scenarioIndex].options[clearLoc.optionIndex].selectedIcon = null;
+    var clearScenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
+    var clearOptionIdx = parseInt(t.getAttribute('data-oidx'),10);
+    state.draft.scenarios[clearScenarioIdx].options[clearOptionIdx].selectedIcon = null;
     debounceSave();
-    renderIconSearchOverlay();
+    render();
     return;
   }
   if(action==='ppPrevScenario'){ if(state.ppScenarioIndex>0){ state.ppScenarioIndex--; render(); } return; }
