@@ -160,7 +160,7 @@
   .page-head h2{color:#fff; font-size:clamp(24px,3vw,30px); margin:6px 0 8px;}
   .page-head p{color:#C7D2DD; font-size:14.5px; max-width:560px; line-height:1.5;}
 
-  .panel{background:var(--paper); border-radius:var(--radius); padding:26px 28px; box-shadow:var(--shadow); margin-bottom:20px;}
+  .panel{background:var(--paper); border-radius:var(--radius); padding:26px 28px; box-shadow:var(--shadow); margin-bottom:20px; container-type:inline-size;}
   .panel h3{font-size:17px; margin-bottom:14px;}
   .row{display:flex; gap:14px;}
   .row > *{flex:1;}
@@ -225,10 +225,25 @@
   .domain-pill.covered{background:rgba(46,139,132,.30); color:#CDEDE9; border-color:rgba(46,139,132,.4);}
 
   /* ---------- Scenario editor ---------- */
-  .lanes{display:flex; gap:14px; margin-bottom:6px; align-items:stretch;}
-  @media (max-width:760px){.lanes{flex-direction:column;}}
+  .lanes{display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:6px;}
+  /* Step the option-card grid up to 2, then 3/4 columns as the panel widens, instead of
+     squeezing every lane into one unwrapped row (which forced lanes past their own
+     min-content width and let them spill past the panel's edge). */
+  @container (min-width:480px){
+    .lanes-2, .lanes-3, .lanes-4{grid-template-columns:repeat(2, minmax(240px,1fr));}
+  }
+  @container (min-width:480px) and (max-width:739.98px){
+    .lanes-3 .lane:last-child{grid-column:1 / -1;} /* odd one out spans full width instead of leaving a dead half-row */
+  }
+  @container (min-width:740px){
+    .lanes-3{grid-template-columns:repeat(3, minmax(240px,1fr));}
+  }
+  @container (min-width:1050px){
+    .lanes-4{grid-template-columns:repeat(4, minmax(240px,1fr));}
+  }
+  .lane, .lane *{min-width:0;}
   .lane{
-    flex:1; border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:9px;
+    border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:9px;
     border-top:6px solid var(--c); background:var(--soft); cursor:grab; position:relative;
   }
   .lane.dragging{opacity:.45;}
@@ -242,10 +257,22 @@
   .icon-desc-box{display:flex; align-items:center; gap:8px; align-self:stretch;}
   .icon-desc-glyph{
     width:38px; height:38px; border-radius:10px; background:#fff; border:1.5px dashed var(--line); color:#B9AF8E;
-    display:flex; align-items:center; justify-content:center; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; flex-shrink:0; position:relative;
   }
   .icon-desc-glyph svg{width:20px; height:20px;}
-  .icon-desc-box input[type=text]{font-weight:500; font-style:italic; font-size:13px;}
+  .icon-desc-glyph img{width:100%; height:100%; object-fit:cover; border-radius:8px;}
+  .icon-desc-clear{
+    position:absolute; top:-6px; right:-6px; width:16px; height:16px; border-radius:50%; padding:0;
+    background:#fff; border:1.5px solid var(--line); color:var(--ink-soft); font-size:9px; line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .icon-desc-clear:hover{color:#9B3B34; border-color:#9B3B34;}
+  .icon-desc-box input[type=text]{font-weight:500; font-style:italic; font-size:13px; flex:1;}
+  .btn-icon-search{
+    flex-shrink:0; padding:7px 12px; font-size:12px; font-weight:600; border-radius:8px;
+    border:1.5px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
+  }
+  .btn-icon-search:hover{background:rgba(31,41,55,.06);}
   .lane input[type=text]{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; font-weight:600;}
   .lane textarea{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; min-height:78px; line-height:1.42; font-size:13.8px;}
   .wc{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-soft); text-align:right;}
@@ -282,6 +309,7 @@
   .p-opt{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:9px; border-left:5px solid var(--c); background:var(--soft);}
   .p-opt .p-opt-icon{width:20px; height:20px; flex-shrink:0; color:var(--c);}
   .p-opt .p-opt-icon svg{width:100%; height:100%;}
+  .p-opt .p-opt-icon img{width:100%; height:100%; object-fit:contain;}
   .p-icon-desc{display:block; font-size:12px; font-style:italic; color:#8a7f5e; margin-top:4px;}
   .p-opt b{font-size:14px;}
   .p-opt span{display:block; font-size:13.5px; color:#3c3527; margin-top:2px;}
@@ -408,6 +436,28 @@
   .guardrail-box summary{color:#fff; font-size:13px; font-weight:600; cursor:pointer;}
   .guardrail-box ul{margin:10px 0 0; padding-left:18px; color:#C7D2DD; font-size:12.5px; line-height:1.7;}
 
+  /* ============ Icon search strip (Noun Project results, inline under an option) ============ */
+  .icon-search-strip{
+    position:relative; background:#F8F8F6; border:1.5px solid var(--line); border-radius:10px;
+    padding:10px 28px 10px 10px; margin-top:-2px;
+  }
+  .icon-search-dismiss{
+    position:absolute; top:6px; right:6px; width:18px; height:18px; border-radius:50%; padding:0;
+    background:#fff; border:1.5px solid var(--line); color:var(--ink-soft); font-size:10px; line-height:1;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .icon-search-dismiss:hover{color:var(--ink); border-color:var(--ink-soft);}
+  .icon-search-status{color:var(--ink-soft); font-size:12.5px; text-align:center; padding:4px 0;}
+  .icon-search-error{color:#9B3B34;}
+  .icon-search-results{display:flex; flex-wrap:wrap; gap:8px;}
+  .icon-search-result{
+    width:44px; height:44px; flex-shrink:0; border-radius:8px; border:1.5px solid var(--line); background:#fff;
+    display:flex; align-items:center; justify-content:center; padding:6px; cursor:pointer;
+  }
+  .icon-search-result:hover{border-color:var(--ink-soft);}
+  .icon-search-result.selected{border-color:var(--ink); background:#EDECE7;}
+  .icon-search-result img{width:100%; height:100%; object-fit:contain;}
+
   /* ============ Player Preview (mimics the real Discussion Session screen) ============ */
   .pp-screen{
     position:fixed; inset:0; z-index:500;
@@ -445,16 +495,28 @@
   }
   .pp-h2{font-family:var(--font-display); font-weight:700; font-size:28px; color:#1D3A6E; margin:0;}
   .pp-setup{font-size:16px; line-height:1.5; color:#25303D; max-width:760px; margin:0;}
-  .pp-opts{display:flex; gap:34px; justify-content:center; flex-wrap:wrap; margin-top:8px; width:100%;}
-  .pp-opts-2 .pp-opt, .pp-opts-3 .pp-opt{flex:0 1 220px;}
-  .pp-opt{display:flex; flex-direction:column; align-items:center; gap:12px;}
+  .pp-card{container-type:inline-size;}
+  .pp-opts{display:grid; grid-template-columns:minmax(140px,220px); gap:28px 34px; justify-content:center; margin-top:8px; width:100%;}
+  .pp-opt{display:flex; flex-direction:column; align-items:center; gap:12px; width:100%; max-width:220px;}
+  /* Step column count up as the card widens, so a row is always fully filled instead of
+     flex-wrap dumping a lonely leftover option onto its own row at in-between widths. */
+  @container (min-width:340px){
+    .pp-opts-2, .pp-opts-4{grid-template-columns:repeat(2, minmax(140px,220px));}
+  }
+  @container (min-width:520px){
+    .pp-opts-3{grid-template-columns:repeat(3, minmax(140px,220px));}
+  }
+  @container (min-width:700px){
+    .pp-opts-4{grid-template-columns:repeat(4, minmax(140px,220px));}
+  }
   .pp-opt-icon{
     width:130px; height:130px; border-radius:14px; background:#EDECE7;
     display:flex; align-items:center; justify-content:center;
     box-shadow:0 4px 10px rgba(0,0,0,.08);
   }
   .pp-opt-icon svg{width:56px; height:56px; color:#161616;}
-  .pp-opt-cap{font-size:14px; line-height:1.4; color:#25303D; max-width:210px;}
+  .pp-opt-icon img{width:58%; height:58%; object-fit:contain;}
+  .pp-opt-cap{font-size:14px; line-height:1.4; color:#25303D; max-width:100%;}
   .pp-checkopts{display:flex; flex-direction:column; gap:10px; width:100%; max-width:440px; margin-top:6px;}
   .pp-checkopt{background:#EDECE7; border-radius:10px; padding:12px 16px; font-size:14.5px; color:#25303D; text-align:left;}
   .pp-cqbar{
@@ -556,6 +618,13 @@ function ppIconFor(text){
    (and point askCoach() at a proxy instead of api.anthropic.com) to re-enable later. */
 var AI_ASSISTANT_ENABLED = false;
 
+/* Master switch for real icon search against the Noun Project, via a serverless proxy
+   that holds the API credentials (see /api/noun-project-search.js — the key must never
+   reach the browser). Off = the icon description field behaves as before (a design team
+   illustrates it later). Available on every option from the start — no completion gate. */
+var ICON_SEARCH_ENABLED = true;
+var ICON_SEARCH_ENDPOINT = '/api/noun-project-search';
+
 var COACH_SYSTEM_PROMPT = [
 "You are a warm, encouraging writing assistant helping a student, age 8 to 14, design their own Discussion Session for Synthesis — a program where kids around the world discuss dilemmas that have two or three options, none of which is correct. A separate human coach also reviews their work later, so you are their first stop, not their only one.",
 "",
@@ -598,7 +667,11 @@ var state = {
   dragLaneIdx: null,
   ppKind: 'scenario',        // player-preview: which block is being previewed — scenario | halftime | reflection
   ppScenarioIndex: 0,        // player-preview: which of the 6 scenarios
-  ppReturnScreen: 'scenario' // player-preview: screen to return to on exit
+  ppReturnScreen: 'scenario', // player-preview: screen to return to on exit
+  iconSearchOpen: null,      // {scenarioIndex, optionIndex} while an option's inline search strip is showing
+  iconSearchResults: [],
+  iconSearchLoading: false,
+  iconSearchError: ''
 };
 
 var REDIRECT_MESSAGE_1 = "This assistant is here to help you build your own Discussion Session for Synthesis — things like scenario setups, options, and questions other students will discuss. Let's focus on that. What part of your session would you like help with?";
@@ -657,7 +730,7 @@ function timeAgo(ts){
 }
 
 /* ============================= MODEL ============================= */
-function newOption(){ return {id:uid(), label:'', rationale:'', iconDescription:''}; }
+function newOption(){ return {id:uid(), label:'', rationale:'', iconDescription:'', selectedIcon:null}; }
 function newScenario(){
   var opts = [];
   var n = (state.draft && state.draft.optionCount) || 3;
@@ -764,6 +837,7 @@ function patchLegacyDraft(d){
       if(typeof o.iconDescription !== 'string'){
         o.iconDescription = o.icon ? (LEGACY_ICON_LABELS[o.icon] || '') : '';
       }
+      if(typeof o.selectedIcon === 'undefined') o.selectedIcon = null;
     });
   });
   return d;
@@ -1057,6 +1131,16 @@ function renderStoryboard(){
 }
 
 /* ---------- Scenario editor ---------- */
+function iconGlyphHtml(o, scenarioIdx, optionIdx){
+  if(!o.selectedIcon) return ICON_PLACEHOLDER_SVG;
+  return '<img class="icon-desc-thumb" src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'+
+    '<button type="button" class="icon-desc-clear" data-action="clearIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Remove icon">✕</button>';
+}
+function iconSearchBtnHtml(scenarioIdx, optionIdx){
+  if(!ICON_SEARCH_ENABLED) return '';
+  var attrs = 'data-action="searchIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Search real icons on the Noun Project"';
+  return '<button type="button" class="btn-icon-search" '+attrs+'>Search</button>';
+}
 function renderScenario(){
   var d = state.draft, i = state.scenarioIndex, sc = d.scenarios[i];
   var domainOpts = allDomains().map(function(label){return '<option value="'+esc(label)+'"'+(sc.domain===label?' selected':'')+'>'+esc(label)+'</option>';}).join('');
@@ -1071,7 +1155,8 @@ function renderScenario(){
           (oi<sc.options.length-1? '<button data-action="moveLane" data-idx="'+oi+'" data-dir="1" title="Move right">▶</button>' : '')+
         '</div>'+
       '</div>'+
-      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+ICON_PLACEHOLDER_SVG+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Describe the icon, e.g. a simple shield"></div>'+
+      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an icon, e.g. shield">'+iconSearchBtnHtml(i, oi)+'</div>'+
+      iconSearchStripHtml(o, i, oi)+
       '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Option label">'+
       '<textarea data-bind="option.rationale" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
       '<div class="wc">'+wordCount(o.rationale)+' words</div>'+
@@ -1110,7 +1195,7 @@ function renderScenario(){
   '<div class="panel">'+
     '<h3>Options — drag to reorder, they should feel equally good</h3>'+
     '<div class="hint" style="margin-bottom:12px; font-size:12.5px; color:var(--ink-soft);">For each option, describe the icon you imagine — simple and black-and-white, like the icons real Synthesis sessions use. Our design team will illustrate it.</div>'+
-    '<div class="lanes">'+lanesHtml+'</div>'+
+    '<div class="lanes lanes-'+sc.options.length+'">'+lanesHtml+'</div>'+
     balHtml+
   '</div>'+
   '<div class="panel">'+
@@ -1172,10 +1257,12 @@ function renderReflection(){
 /* ---------- Player preview (real Discussion Session look) ---------- */
 function renderPPScenario(sc, i){
   var optsHtml = sc.options.map(function(o){
-    var iconSvg = ppIconFor((o.iconDescription||'')+' '+(o.label||'')+' '+(o.rationale||''));
+    var iconHtml = o.selectedIcon
+      ? '<img src="'+esc(o.selectedIcon.iconUrl || o.selectedIcon.thumbnailUrl)+'" alt="">'
+      : ppIconFor((o.iconDescription||'')+' '+(o.label||'')+' '+(o.rationale||''));
     var label = o.label.trim() || 'Untitled option';
     var rationale = o.rationale.trim();
-    return '<div class="pp-opt"><div class="pp-opt-icon">'+iconSvg+'</div><div class="pp-opt-cap"><b>'+esc(label)+'</b>'+(rationale? ': '+esc(rationale):'')+'</div></div>';
+    return '<div class="pp-opt"><div class="pp-opt-icon">'+iconHtml+'</div><div class="pp-opt-cap"><b>'+esc(label)+'</b>'+(rationale? ': '+esc(rationale):'')+'</div></div>';
   }).join('');
   var cq = sc.challenge.filter(function(q){return q.trim();})[0] || '';
   return ''+
@@ -1226,7 +1313,10 @@ function renderReviewPreview(d){
   var scenarioBlocks = d.scenarios.map(function(sc,i){
     var opts = sc.options.map(function(o,oi){
       var lane = LANES[oi];
-      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+ICON_PLACEHOLDER_SVG+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b><span>'+esc(o.rationale)+'</span>'+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+'</div></div>';
+      var iconHtml = o.selectedIcon
+        ? '<img src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'
+        : ICON_PLACEHOLDER_SVG;
+      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b><span>'+esc(o.rationale)+'</span>'+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+'</div></div>';
     }).join('');
     var cqs = sc.challenge.filter(function(q){return q.trim();}).map(function(q){return '<div>'+esc(q)+'</div>';}).join('');
     var block = '<div class="p-scenario"><h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">👁 Preview</span></h4>'+
@@ -1603,6 +1693,45 @@ function removeNotesOverlay(){
   if(existing) existing.remove();
 }
 
+/* ============================= ICON SEARCH (Noun Project, via serverless proxy) ============================= */
+function performIconSearch(query){
+  state.iconSearchLoading = true;
+  state.iconSearchError = '';
+  state.iconSearchResults = [];
+  render();
+  fetch(ICON_SEARCH_ENDPOINT+'?q='+encodeURIComponent(query))
+    .then(function(res){
+      if(!res.ok) throw new Error('search-failed');
+      return res.json();
+    })
+    .then(function(data){
+      state.iconSearchLoading = false;
+      state.iconSearchResults = (data && Array.isArray(data.results)) ? data.results : [];
+      render();
+    })
+    .catch(function(){
+      state.iconSearchLoading = false;
+      state.iconSearchError = "Icon search isn't working right now — try again in a bit.";
+      render();
+    });
+}
+function iconSearchStripHtml(o, scenarioIdx, optionIdx){
+  var loc = state.iconSearchOpen;
+  if(!loc || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
+  var resultsHtml = state.iconSearchResults.map(function(icon, idx){
+    var selected = o.selectedIcon && o.selectedIcon.id===icon.id;
+    return '<button type="button" class="icon-search-result'+(selected?' selected':'')+'" data-action="selectIcon" data-idx="'+idx+'" title="'+esc(icon.attributionName||'Noun Project icon')+'"><img src="'+esc(icon.thumbnailUrl)+'" alt=""></button>';
+  }).join('');
+  var body = state.iconSearchLoading
+    ? '<div class="icon-search-status">Searching…</div>'
+    : state.iconSearchError
+      ? '<div class="icon-search-status icon-search-error">'+esc(state.iconSearchError)+'</div>'
+      : (state.iconSearchResults.length
+          ? '<div class="icon-search-results">'+resultsHtml+'</div>'
+          : '<div class="icon-search-status">No icons found. Try a simpler word.</div>');
+  return '<div class="icon-search-strip"><button type="button" class="icon-search-dismiss" data-action="dismissIconSearch" title="Close">✕</button>'+body+'</div>';
+}
+
 /* ============================= AI COACH CALL ============================= */
 function askCoach(userText, contextObj){
   var d = state.draft;
@@ -1689,6 +1818,10 @@ function handleVerdict(verdict, reply, userText){
 }
 
 /* ============================= MARKDOWN EXPORT ============================= */
+function iconExportFilename(o){
+  var word = (o.iconDescription || o.label || 'icon').trim().toLowerCase().split(/\s+/)[0].replace(/[^a-z0-9]/g,'') || 'icon';
+  return 'noun-'+word+'-'+o.selectedIcon.id+'.webp';
+}
 function toMarkdown(d){
   var lines = [];
   lines.push('# '+(d.title||'Untitled Session'));
@@ -1720,7 +1853,14 @@ function toMarkdown(d){
     sc.options.forEach(function(o,oi){
       lines.push((oi+1)+'.\t'+(o.label||'(untitled)')+': '+(o.rationale||''));
       lines.push('');
-      lines.push('![Icon placeholder — '+(o.iconDescription? o.iconDescription : 'no description yet')+'](icon-placeholder.webp)');
+      if(o.selectedIcon){
+        lines.push('!['+iconExportFilename(o)+']('+o.selectedIcon.iconUrl+')');
+        if(o.selectedIcon.attributionName){
+          lines.push('<!-- Icon credit: '+o.selectedIcon.attributionName+(o.selectedIcon.attributionUrl? ' — '+o.selectedIcon.attributionUrl : '')+' -->');
+        }
+      } else {
+        lines.push('![Icon placeholder — '+(o.iconDescription? o.iconDescription : 'no description yet')+'](icon-placeholder.webp)');
+      }
       lines.push('');
     });
     lines.push('`challenge questions`');
@@ -1977,6 +2117,35 @@ function handleClick(e){
     render(); return;
   }
   if(action==='closePlayerPreview'){ state.screen = state.ppReturnScreen || 'storyboard'; render(); return; }
+  if(action==='searchIcon'){
+    var scenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
+    var optionIdx = parseInt(t.getAttribute('data-oidx'),10);
+    var query = state.draft.scenarios[scenarioIdx].options[optionIdx].iconDescription.trim();
+    if(!query) return;
+    state.iconSearchOpen = {scenarioIndex:scenarioIdx, optionIndex:optionIdx};
+    performIconSearch(query);
+    return;
+  }
+  if(action==='dismissIconSearch'){ state.iconSearchOpen = null; render(); return; }
+  if(action==='selectIcon'){
+    var iconIdx = parseInt(t.getAttribute('data-idx'),10);
+    var icon = state.iconSearchResults[iconIdx];
+    if(!icon || !state.iconSearchOpen) return;
+    var loc = state.iconSearchOpen;
+    state.draft.scenarios[loc.scenarioIndex].options[loc.optionIndex].selectedIcon = icon;
+    debounceSave();
+    state.iconSearchOpen = null;
+    render();
+    return;
+  }
+  if(action==='clearIcon'){
+    var clearScenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
+    var clearOptionIdx = parseInt(t.getAttribute('data-oidx'),10);
+    state.draft.scenarios[clearScenarioIdx].options[clearOptionIdx].selectedIcon = null;
+    debounceSave();
+    render();
+    return;
+  }
   if(action==='ppPrevScenario'){ if(state.ppScenarioIndex>0){ state.ppScenarioIndex--; render(); } return; }
   if(action==='ppNextScenario'){ if(state.ppScenarioIndex<5){ state.ppScenarioIndex++; render(); } return; }
 
