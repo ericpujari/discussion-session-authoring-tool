@@ -330,51 +330,52 @@
   @keyframes blink{0%,80%,100%{opacity:.25;} 40%{opacity:1;}}
 
   /* ---------- Sticky notes ---------- */
-  .note-tab{
-    background:rgba(0,0,0,.06); border:1px solid rgba(0,0,0,.08); border-radius:8px; padding:4px 7px; cursor:pointer;
-    font-size:13px; display:inline-flex; align-items:center; gap:4px; line-height:1; color:var(--ink-soft);
+  /* z-index budget: stack/trash sit at 45 (above the dormant coach tab's 40, below
+     the coach drawer's 50 and the full-screen player-preview modal's 500 — see
+     CLAUDE.md's note about not colliding with the AI coach overlay if it's ever
+     turned back on). Individual notes use noteZCounter (starts at 40) for stacking
+     order among themselves; the trash icon sits above all of it at 9999 so it's
+     never accidentally buried under a pile of notes. */
+  .note-stack{
+    position:fixed; right:26px; top:50%; transform:translateY(-50%); width:96px; height:96px; z-index:45;
   }
-  .note-tab:hover{background:rgba(0,0,0,.1);}
-  .note-count{
-    background:var(--ink); color:#fff; font-family:var(--font-mono); font-size:10px; font-weight:700;
-    border-radius:999px; padding:1px 6px; line-height:1.4;
+  .note-stack-sheet{
+    position:absolute; inset:0; border-radius:6px; background:#F5E6A8; box-shadow:0 3px 10px rgba(0,0,0,.25);
   }
-  .notes-tab{
-    position:fixed; right:0; top:calc(50% - 68px); transform:translateY(-50%); z-index:40;
-    background:#B9791F; color:#fff; padding:14px 12px; border-radius:12px 0 0 12px; box-shadow:var(--shadow);
-    display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; font-weight:700; cursor:pointer; border:none;
+  .note-stack-sheet:nth-child(1){transform:rotate(-6deg) translate(-4px,3px);}
+  .note-stack-sheet:nth-child(2){transform:rotate(4deg) translate(3px,-2px);}
+  .note-stack-top{
+    transform:rotate(-2deg); cursor:grab; display:flex; align-items:center; justify-content:center;
+    font-size:26px; color:rgba(0,0,0,.35); user-select:none;
   }
-  .notes-tab-count{background:rgba(255,255,255,.3); border-radius:999px; padding:1px 6px; font-size:10.5px;}
-  .notes-drawer{
-    position:fixed; top:0; right:0; height:100vh; width:380px; max-width:92vw; background:#FBF6E9; box-shadow:-8px 0 30px rgba(0,0,0,.35);
-    z-index:50; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .18s cubic-bezier(.4,0,1,1);
+  .note-stack-top:active{cursor:grabbing;}
+  .note-stack-hint{
+    position:fixed; right:20px; top:calc(50% + 58px); width:110px; text-align:center;
+    font-size:11px; color:#C7D2DD; z-index:45; pointer-events:none;
   }
-  .notes-drawer.open{transform:translateX(0); transition:transform .42s cubic-bezier(.34,1.56,.64,1);}
-  .notes-head{padding:18px 18px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:flex-start;}
-  .notes-head h3{font-size:16.5px;}
-  .notes-head p{font-size:12.5px; color:var(--ink-soft); margin-top:3px;}
-  .notes-close{background:none; border:none; font-size:20px; color:var(--ink-soft); line-height:1;}
-  .notes-body{flex:1; overflow-y:auto; padding:16px 18px;}
-  .notes-focus{margin-bottom:22px; padding-bottom:18px; border-bottom:2px dashed rgba(0,0,0,.12);}
-  .notes-focus-label, .notes-all-label{font-family:var(--font-mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:#9B8F6E; margin-bottom:10px; font-weight:700;}
-  .notes-all-label{margin-top:4px;}
-  .notes-group{margin-bottom:16px;}
-  .notes-group-label{font-size:12px; font-weight:600; color:var(--ink-soft); margin-bottom:8px;}
-  .notes-empty{color:#A69A78; font-size:13px; font-style:italic; padding:10px 0;}
-  .note-card{
-    border-radius:8px; padding:10px 11px 8px; margin-bottom:10px; box-shadow:0 3px 8px rgba(0,0,0,.12);
-    transform:rotate(-0.6deg);
+  .note-trash{
+    position:fixed; right:132px; top:50%; transform:translateY(-50%) scale(.8); width:52px; height:52px;
+    border-radius:50%; background:#3a2a1a; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
+    font-size:22px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:9999;
   }
-  .note-card:nth-child(even){transform:rotate(0.6deg);}
-  .note-card.dragging{opacity:.4;}
-  .note-card-head{display:flex; align-items:center; gap:6px; margin-bottom:6px;}
-  .note-drag-handle{
-    color:rgba(0,0,0,.32); cursor:grab; padding:6px 7px; margin:-6px -7px -6px -3px; border-radius:5px;
-    display:flex; align-items:center; flex-shrink:0;
+  .note-trash.visible{opacity:1; pointer-events:auto; transform:translateY(-50%) scale(1);}
+  .sticky-note{
+    position:fixed; width:170px; min-height:170px; border-radius:4px; background:#F5E6A8;
+    box-shadow:0 6px 16px rgba(0,0,0,.3); padding:26px 8px 8px; display:flex; flex-direction:column; gap:6px;
   }
-  .note-drag-handle:hover{background:rgba(0,0,0,.06); color:rgba(0,0,0,.5);}
-  .note-drag-handle:active{cursor:grabbing;}
-  .note-colors{display:flex; gap:4px; margin-right:auto;}
+  .sticky-note.note-pink{background:#F5C6D6;} .sticky-note.note-blue{background:#C6DCF5;}
+  .sticky-note.note-green{background:#C9E8CE;} .sticky-note.note-purple{background:#DAC6F0;}
+  .sticky-note.selected{outline:2px solid #fff; outline-offset:-2px;}
+  .sticky-note.over-trash{opacity:.45;}
+  .sticky-drag-handle{
+    position:absolute; top:0; left:0; right:0; height:22px; background:rgba(0,0,0,.08); border-radius:4px 4px 0 0;
+    cursor:grab; display:flex; justify-content:space-between; align-items:center; padding:0 6px; color:rgba(0,0,0,.35);
+  }
+  .sticky-drag-handle:active{cursor:grabbing;}
+  .note-colors{
+    position:absolute; top:-14px; left:8px; display:flex; gap:4px; opacity:0; pointer-events:none; transition:opacity .12s;
+  }
+  .sticky-note:hover .note-colors{opacity:1; pointer-events:auto;}
   .note-color-dot{width:13px; height:13px; border-radius:50%; border:1.5px solid rgba(0,0,0,.15); padding:0; cursor:pointer;}
   .note-color-dot.selected{box-shadow:0 0 0 2px #fff, 0 0 0 3.5px var(--ink);}
   .note-color-yellow, .note-color-dot.note-color-yellow{background:#F5E6A8;}
@@ -382,17 +383,11 @@
   .note-color-blue, .note-color-dot.note-color-blue{background:#C6DCF5;}
   .note-color-green, .note-color-dot.note-color-green{background:#C9E8CE;}
   .note-color-purple, .note-color-dot.note-color-purple{background:#DAC6F0;}
-  .note-card.note-yellow{background:#F5E6A8;} .note-card.note-pink{background:#F5C6D6;}
-  .note-card.note-blue{background:#C6DCF5;} .note-card.note-green{background:#C9E8CE;} .note-card.note-purple{background:#DAC6F0;}
   .note-delete{background:none; border:none; font-size:13px; color:rgba(0,0,0,.4); cursor:pointer; line-height:1;}
   .note-delete:hover{color:rgba(0,0,0,.7);}
-  .note-card textarea{
-    width:100%; background:rgba(255,255,255,.5); border:1px solid rgba(0,0,0,.08); border-radius:6px; padding:7px 8px;
-    font-size:13px; min-height:52px; resize:vertical; color:#3c3527;
-  }
-  .note-composer{display:flex; flex-direction:column; gap:8px;}
-  .note-composer textarea{
-    border:1.5px solid var(--line); border-radius:8px; padding:9px 10px; font-size:13.5px; min-height:60px; resize:vertical; background:#fff;
+  .sticky-note textarea{
+    flex:1; width:100%; resize:none; overflow-y:auto; border:none; background:transparent;
+    font-size:13px; font-family:inherit; color:#3c3527;
   }
 
   /* ---------- Coach inbox ---------- */
@@ -590,8 +585,6 @@ var state = {
   draft: null,
   moderation: null,
   notes: [],
-  notesOpen: false,
-  notesFocusAttach: null,
   scenarioIndex: 0,
   coachOpen: false,
   coachLoading: false,
@@ -603,7 +596,6 @@ var state = {
   addingCustomDomain: false,
   dragScenarioIdx: null,
   dragLaneIdx: null,
-  dragNoteId: null,
   ppKind: 'scenario',        // player-preview: which block is being previewed — scenario | halftime | reflection
   ppScenarioIndex: 0,        // player-preview: which of the 6 scenarios
   ppReturnScreen: 'scenario' // player-preview: screen to return to on exit
@@ -625,6 +617,8 @@ function esc(s){
   });
 }
 function uid(){ return Math.random().toString(36).slice(2,9); }
+function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+var STICKY_W = 170, STICKY_H = 170, HANDLE_H = 22;
 function genCode(){
   var alpha = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   var s = '';
@@ -701,8 +695,9 @@ function newDraft(name){
 
 /* ---------- Private sticky notes (never shared with coach) ---------- */
 var NOTE_COLORS = ['yellow','pink','blue','green','purple'];
-function newNote(attach, text){
-  return {id:uid(), text:text||'', color:'yellow', attach:attach, createdAt:Date.now(), updatedAt:Date.now()};
+var noteZCounter = 40, selectedNoteId = null;
+function newNote(attach, text, x, y){
+  return {id:uid(), text:text||'', color:'yellow', attach:attach, x:x, y:y, z:++noteZCounter, createdAt:Date.now(), updatedAt:Date.now()};
 }
 function attachKey(attach){
   if(!attach) return 'storyboard';
@@ -723,6 +718,14 @@ function attachLabel(attach){
 function notesFor(attach){
   var key = attachKey(attach);
   return state.notes.filter(function(n){ return attachKey(n.attach)===key; });
+}
+function currentAttachForScreen(){
+  if(state.screen==='setup') return {type:'setup'};
+  if(state.screen==='storyboard') return {type:'storyboard'};
+  if(state.screen==='scenario') return {type:'scenario', scenarioIndex: state.scenarioIndex};
+  if(state.screen==='halftimeEditor') return {type:'halftime'};
+  if(state.screen==='reflection') return {type:'reflection'};
+  return {type:'storyboard'}; // 'review' has no dedicated space; falls back to general
 }
 
 /* ============================= STORAGE ============================= */
@@ -876,7 +879,7 @@ function render(){
   attachGlobalHandlers();
   if(state.screen!=='home' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='playerPreview' && state.draft){
     if(AI_ASSISTANT_ENABLED) renderCoachOverlay();
-    renderNotesOverlay();
+    renderStickyLayer();
   }
 }
 
@@ -970,7 +973,7 @@ function renderShellDraft(){
 function renderSetup(){
   var d = state.draft;
   return ''+
-  '<div class="page-head" data-drop-attach="'+esc(JSON.stringify({type:'setup'}))+'"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">STEP 1</div>'+renderNoteTab({type:'setup'})+'</div><h2>Set up your session</h2><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
+  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">STEP 1</div></div><h2>Set up your session</h2><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
   '<div class="panel">'+
     '<div class="field"><label>Title</label><input type="text" data-bind="title" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">A short phrase, often a question. 1-4 words.</div></div>'+
     '<div class="field"><label>Overall idea for this session</label><textarea data-bind="bigIdea" placeholder="What real-life tension does this session explore? Why does it matter to you?" style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">More detail helps — context, examples, why it matters. Every session ends with the same spirit: "'+MANTRA+'"</div></div>'+
@@ -987,15 +990,13 @@ function renderCoachNotesPreview(){
 /* ---------- Storyboard ---------- */
 function renderHalftimeCard(d){
   var h = d.halftime;
-  var attach = {type:'halftime'};
   return ''+
-  '<div class="index-card halftime-card" data-action="openHalftime" data-drop-attach="'+esc(JSON.stringify(attach))+'">'+
+  '<div class="index-card halftime-card" data-action="openHalftime">'+
     '<span class="halftime-pin">🚩</span>'+
     '<div class="num">HALFTIME · AFTER SCENARIO 3</div>'+
     '<h4>'+(h.question.trim()? esc(h.question.slice(0,70))+(h.question.length>70?'…':'') : '<span class="empty">Click to write the halftime check-in</span>')+'</h4>'+
     '<div style="display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap;">'+
       '<span class="domain-chip">📌 Fixed here — can\'t be dragged</span>'+
-      renderNoteTab(attach)+
     '</div>'+
   '</div>';
 }
@@ -1003,16 +1004,14 @@ function renderStoryboard(){
   var d = state.draft;
   var cardEls = d.scenarios.map(function(sc,i){
     var rot = (i%2===0? -1.2 : 1.4) * (1 + (i%3)*0.3);
-    var attach = {type:'scenario', scenarioIndex:i};
     return ''+
-    '<div class="index-card" style="--r:'+rot+'deg" draggable="true" data-action="openScenario" data-idx="'+i+'" data-drag="scenario" data-dragidx="'+i+'" data-drop-attach="'+esc(JSON.stringify(attach))+'">'+
+    '<div class="index-card" style="--r:'+rot+'deg" draggable="true" data-action="openScenario" data-idx="'+i+'" data-drag="scenario" data-dragidx="'+i+'">'+
       '<div class="pin"></div>'+
       '<div class="num">SCENARIO '+(i+1)+' OF 6</div>'+
       '<h4>'+(sc.title? esc(sc.title) : '<span class="empty">Untitled — click to write</span>')+'</h4>'+
       (sc.setup? '<div style="font-size:12px; color:#7a7156; line-height:1.4;">'+esc(sc.setup.slice(0,70))+(sc.setup.length>70?'…':'')+'</div>' : '')+
       '<div style="display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap;">'+
         (sc.domain? '<span class="domain-chip">'+esc(sc.domain)+'</span>' : '')+
-        renderNoteTab(attach)+
       '</div>'+
     '</div>';
   });
@@ -1031,8 +1030,7 @@ function renderStoryboard(){
 
   return ''+
   '<div class="page-head"><div class="eyebrow">STEP 2</div><h2>Your storyboard</h2><p>Drag the scenario cards to set their order. Click any card to write it — the halftime card always stays put, right after scenario 3.</p></div>'+
-  '<div style="margin-bottom:14px;">'+renderNoteTab({type:'storyboard'})+' <span style="color:#8B98A6; font-size:12px; margin-left:6px;">General notes about this session</span></div>'+
-  '<div class="board" data-drop-attach="'+esc(JSON.stringify({type:'storyboard'}))+'">'+
+  '<div class="board">'+
     '<div style="display:flex; align-items:flex-start; justify-content:space-between; flex-wrap:wrap; gap:16px; margin-bottom:20px;">'+
       '<div>'+
         '<div style="color:#fff; font-weight:600; font-size:14px; margin-bottom:8px;">How many options per scenario?</div>'+
@@ -1065,16 +1063,14 @@ function renderScenario(){
   domainOpts += '<option value="__add_new__">+ Add a new domain…</option>';
   var lanesHtml = sc.options.map(function(o,oi){
     var lane = LANES[oi];
-    var optAttach = {type:'option', scenarioIndex:i, optionIndex:oi};
     return ''+
-    '<div class="lane" style="--c:'+lane.color+'; --soft:'+lane.soft+'" draggable="true" data-drag="lane" data-dragidx="'+oi+'" data-drop-attach="'+esc(JSON.stringify(optAttach))+'">'+
+    '<div class="lane" style="--c:'+lane.color+'; --soft:'+lane.soft+'" draggable="true" data-drag="lane" data-dragidx="'+oi+'">'+
       '<div class="lane-head"><span class="lane-tag">Option '+(oi+1)+'</span>'+
         '<div class="move-btns">'+
           (oi>0? '<button data-action="moveLane" data-idx="'+oi+'" data-dir="-1" title="Move left">◀</button>' : '')+
           (oi<sc.options.length-1? '<button data-action="moveLane" data-idx="'+oi+'" data-dir="1" title="Move right">▶</button>' : '')+
         '</div>'+
       '</div>'+
-      renderNoteTab(optAttach)+
       '<div class="icon-desc-box"><span class="icon-desc-glyph">'+ICON_PLACEHOLDER_SVG+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Describe the icon, e.g. a simple shield"></div>'+
       '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Option label">'+
       '<textarea data-bind="option.rationale" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
@@ -1095,7 +1091,7 @@ function renderScenario(){
   }).join('');
 
   return ''+
-  '<div class="page-head" data-drop-attach="'+esc(JSON.stringify({type:'scenario', scenarioIndex:i}))+'"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;"><div class="glass-pill"><span class="eyebrow">SCENARIO '+(i+1)+' OF 6</span></div>'+renderNoteTab({type:'scenario', scenarioIndex:i})+'<button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="scenario" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>'+esc(sc.title||'Untitled scenario')+'</h2><p>Real sessions run about 4 minutes per scenario. Setup is 1-3 sentences, second person, ending in a question.</p></div>'+
+  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;"><div class="glass-pill"><span class="eyebrow">SCENARIO '+(i+1)+' OF 6</span></div><button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="scenario" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>'+esc(sc.title||'Untitled scenario')+'</h2><p>Real sessions run about 4 minutes per scenario. Setup is 1-3 sentences, second person, ending in a question.</p></div>'+
   '<div class="panel">'+
     '<div class="row">'+
       '<div class="field"><label>Scenario title</label><input type="text" data-bind="scTitle" value="'+esc(sc.title)+'" placeholder="e.g. The Group Project"></div>'+
@@ -1134,7 +1130,7 @@ function renderScenario(){
 function renderHalftimeEditor(){
   var d = state.draft, h = d.halftime;
   return ''+
-  '<div class="page-head" data-drop-attach="'+esc(JSON.stringify({type:'halftime'}))+'"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">HALFTIME · AFTER SCENARIO 3</div>'+renderNoteTab({type:'halftime'})+'<button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="halftime" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>Halftime check-in</h2><p>A short pulse-check, not a 7th scenario. This card always stays put on the storyboard.</p></div>'+
+  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">HALFTIME · AFTER SCENARIO 3</div><button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="halftime" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>Halftime check-in</h2><p>A short pulse-check, not a 7th scenario. This card always stays put on the storyboard.</p></div>'+
   '<div class="panel">'+
     '<div class="field"><label>Halftime question</label><textarea data-bind="halftimeQ" placeholder="e.g. How much are you contributing so far?">'+esc(h.question)+'</textarea></div>'+
     '<label style="display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Options</label>'+
@@ -1160,7 +1156,7 @@ function renderOptionsEditor(obj, kind){
 function renderReflection(){
   var d = state.draft, r = d.reflection;
   return ''+
-  '<div class="page-head" data-drop-attach="'+esc(JSON.stringify({type:'reflection'}))+'"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">STEP 3</div>'+renderNoteTab({type:'reflection'})+'<button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="reflection" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>Closing reflection</h2><p>What do you want people to consider as the session ends?</p></div>'+
+  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">STEP 3</div><button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="reflection" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>Closing reflection</h2><p>What do you want people to consider as the session ends?</p></div>'+
   '<div class="panel">'+
     '<div class="field"><label>Closing question</label><textarea data-bind="reflectionQ" placeholder="e.g. Which skill matters more overall?">'+esc(r.question)+'</textarea></div>'+
     '<label style="display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Options</label>'+
@@ -1445,69 +1441,32 @@ function removeCoachOverlay(){
   if(existing) existing.remove();
 }
 
-/* ============================= NOTES DRAWER (private sticky notes) ============================= */
-function renderNoteTab(attach){
-  var notes = notesFor(attach);
-  return '<button class="note-tab" data-action="openNoteTab" data-attach-json="'+esc(JSON.stringify(attach))+'" title="Notes for '+esc(attachLabel(attach))+'">🗒️'+(notes.length? '<span class="note-count">'+notes.length+'</span>' : '')+'</button>';
-}
+/* ============================= STICKY NOTES (private, freeform, per-screen) ============================= */
 var DRAG_HANDLE_SVG = '<svg viewBox="0 0 10 16" width="10" height="16" fill="currentColor"><circle cx="2" cy="2" r="1.3"/><circle cx="8" cy="2" r="1.3"/><circle cx="2" cy="8" r="1.3"/><circle cx="8" cy="8" r="1.3"/><circle cx="2" cy="14" r="1.3"/><circle cx="8" cy="14" r="1.3"/></svg>';
-function renderNoteCard(n){
+function renderStickyNote(n){
+  var sel = n.id===selectedNoteId ? ' selected' : '';
   return ''+
-  '<div class="note-card note-'+n.color+'">'+
-    '<div class="note-card-head">'+
-      '<span class="note-drag-handle" draggable="true" data-drag="note" data-noteid="'+n.id+'" title="Drag to move this note">'+DRAG_HANDLE_SVG+'</span>'+
-      '<div class="note-colors">'+NOTE_COLORS.map(function(c){
-        return '<button class="note-color-dot note-color-'+c+(c===n.color?' selected':'')+'" data-action="setNoteColor" data-noteid="'+n.id+'" data-color="'+c+'" title="'+c+'"></button>';
-      }).join('')+'</div>'+
+  '<div class="sticky-note note-'+n.color+sel+'" data-noteid="'+n.id+'" style="left:'+n.x+'px; top:'+n.y+'px; z-index:'+n.z+'">'+
+    '<div class="sticky-drag-handle" data-drag-note="'+n.id+'">'+DRAG_HANDLE_SVG+
       '<button class="note-delete" data-action="deleteNote" data-noteid="'+n.id+'" title="Delete note">✕</button>'+
     '</div>'+
+    '<div class="note-colors">'+NOTE_COLORS.map(function(c){
+      return '<button class="note-color-dot note-color-'+c+(c===n.color?' selected':'')+'" data-action="setNoteColor" data-noteid="'+n.id+'" data-color="'+c+'" title="'+c+'"></button>';
+    }).join('')+'</div>'+
     '<textarea data-bind="noteText" data-noteid="'+n.id+'" placeholder="Write a thought...">'+esc(n.text)+'</textarea>'+
   '</div>';
 }
-function renderNoteComposer(attach){
-  return ''+
-  '<div class="note-composer">'+
-    '<textarea id="newNoteText" placeholder="Add a note here...— brainstorm, remind yourself, whatever"></textarea>'+
-    '<button class="btn btn-primary btn-small" data-action="addNote" data-attach-json="'+esc(JSON.stringify(attach))+'">+ Add note</button>'+
-  '</div>';
-}
-function renderNotesOverlay(){
-  var totalCount = state.notes.length;
-  var focusAttach = state.notesFocusAttach || {type:'storyboard'};
-  var focusKey = attachKey(focusAttach);
-  var focusNotes = notesFor(focusAttach);
-
-  var groups = {}, order = [];
-  state.notes.forEach(function(n){
-    var k = attachKey(n.attach);
-    if(k===focusKey) return; // shown in the focus section already
-    if(!groups[k]){ groups[k]=[]; order.push(k); }
-    groups[k].push(n);
-  });
-
-  var focusSection = ''+
-    '<div class="notes-focus">'+
-      '<div class="notes-focus-label">📍 '+esc(attachLabel(focusAttach))+'</div>'+
-      focusNotes.map(renderNoteCard).join('')+
-      renderNoteComposer(focusAttach)+
-    '</div>';
-
-  var allSection = order.length ? (
-    '<div class="notes-all-label">Everywhere else</div>'+
-    order.map(function(k){
-      var group = groups[k];
-      return '<div class="notes-group"><div class="notes-group-label">'+esc(attachLabel(group[0].attach))+'</div>'+
-        group.map(renderNoteCard).join('')+
-      '</div>';
-    }).join('')
-  ) : (totalCount===0 ? '<div class="notes-empty">No notes yet. Jot down anything you want to remember — you can drag notes onto any card later to move them.</div>' : '');
-
+function renderStickyLayer(){
+  var attach = currentAttachForScreen();
+  var notes = notesFor(attach);
   var html = ''+
-  '<button class="notes-tab" data-action="toggleNotes">🗒️<span>Notes</span>'+(totalCount? '<span class="notes-tab-count">'+totalCount+'</span>' : '')+'</button>'+
-  '<div class="notes-drawer'+(state.notesOpen?' open':'')+'">'+
-    '<div class="notes-head"><div><h3>My Notes</h3><p>Private — only you can see these, not your coach.</p></div><button class="notes-close" data-action="toggleNotes">✕</button></div>'+
-    '<div class="notes-body">'+focusSection+allSection+'</div>'+
-  '</div>';
+    '<div class="note-stack">'+
+      '<div class="note-stack-sheet"></div><div class="note-stack-sheet"></div>'+
+      '<div class="note-stack-sheet note-stack-top" id="noteStackTop">+</div>'+
+    '</div>'+
+    '<div class="note-stack-hint">Drag or click to grab a note</div>'+
+    '<div class="note-trash" id="noteTrash" title="Drag a note here to throw it away">🗑️</div>'+
+    notes.map(renderStickyNote).join('');
 
   var existing = document.getElementById('notesOverlayRoot');
   var wrap = existing;
@@ -1521,29 +1480,123 @@ function renderNotesOverlay(){
   wrap.innerHTML = html;
   if(isNew){
     wrap.addEventListener('click', handleClick);
-    wrap.addEventListener('dragstart', handleDragStart);
-    wrap.addEventListener('dragend', handleDragEnd);
-  }
-  attachNotesInputHandlers(wrap);
-}
-function attachNotesInputHandlers(wrap){
-  wrap.querySelectorAll('textarea[data-bind="noteText"]').forEach(function(el){
-    el.addEventListener('input', function(){
-      var id = el.getAttribute('data-noteid');
-      var note = state.notes.filter(function(n){ return n.id===id; })[0];
-      if(note){ note.text = el.value; note.updatedAt = Date.now(); debounceSaveNotes(); }
-    });
-  });
-  var newNoteInput = wrap.querySelector('#newNoteText');
-  if(newNoteInput){
-    newNoteInput.addEventListener('keydown', function(e){
-      if(e.key==='Enter' && !e.shiftKey){
-        e.preventDefault();
-        var btn = wrap.querySelector('[data-action="addNote"]');
-        if(btn) btn.click();
+    // Clicking empty overlay background (not a note) clears the selection outline.
+    wrap.addEventListener('pointerdown', function(e){
+      if(!e.target.closest('.sticky-note') && selectedNoteId){
+        selectedNoteId = null;
+        wrap.querySelectorAll('.sticky-note.selected').forEach(function(el){ el.classList.remove('selected'); });
       }
     });
   }
+  attachStickyInputHandlers(wrap, attach);
+}
+function attachStickyInputHandlers(wrap, attach){
+  wrap.querySelectorAll('.sticky-note').forEach(function(cardEl){
+    var noteId = cardEl.getAttribute('data-noteid');
+    // Selecting (and bringing to front) is separate from dragging, so clicking
+    // anywhere on a note — including its textarea — always raises it, even
+    // though (per the handle-band rule below) a note's handle never actually
+    // ends up fully buried in the first place.
+    cardEl.addEventListener('pointerdown', function(){
+      selectedNoteId = noteId;
+      var note = state.notes.filter(function(n){ return n.id===noteId; })[0];
+      if(note){ note.z = ++noteZCounter; cardEl.style.zIndex = note.z; }
+      wrap.querySelectorAll('.sticky-note.selected').forEach(function(el){ el.classList.remove('selected'); });
+      cardEl.classList.add('selected');
+    });
+  });
+  wrap.querySelectorAll('textarea[data-bind="noteText"]').forEach(function(el){
+    el.addEventListener('input', function(){
+      var note = state.notes.filter(function(n){ return n.id===el.getAttribute('data-noteid'); })[0];
+      if(note){ note.text = el.value; note.updatedAt = Date.now(); debounceSaveNotes(); }
+    });
+  });
+  wrap.querySelectorAll('[data-drag-note]').forEach(function(handle){
+    handle.addEventListener('pointerdown', function(e){
+      if(e.target.closest('.note-delete')) return; // let the delete button's own click through
+      var note = state.notes.filter(function(n){ return n.id===handle.getAttribute('data-drag-note'); })[0];
+      if(note) startNoteDrag(e, note);
+    });
+  });
+  var stackTop = wrap.querySelector('#noteStackTop');
+  if(stackTop){
+    stackTop.addEventListener('pointerdown', function(e){
+      var x = clamp(e.clientX - STICKY_W/2, 0, window.innerWidth-STICKY_W);
+      var y = clamp(e.clientY - STICKY_H/2, 0, window.innerHeight-STICKY_H);
+      var note = newNote(attach, '', x, y);
+      state.notes.push(note);
+      renderStickyLayer();
+      startNoteDrag(e, note); // pulling from the stack is just a drag that starts on a brand-new note
+    });
+  }
+}
+function showTrash(visible){
+  var t = document.getElementById('noteTrash');
+  if(t) t.classList.toggle('visible', visible);
+}
+function isOverTrash(noteEl){
+  var t = document.getElementById('noteTrash');
+  if(!t || !noteEl) return false;
+  var a = noteEl.getBoundingClientRect(), b = t.getBoundingClientRect();
+  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+}
+// Ensures a just-moved note never fully covers another note's grab-bar band,
+// so every note in a pile stays individually grabbable by its visible top edge —
+// mirrors how a real pile of sticky notes fans out. Runs once, on drop (not
+// continuously mid-drag), so dragging itself stays smooth and unconstrained.
+function resolveHandleOcclusion(note){
+  var guard = 0, moved = true;
+  while(moved && guard < 50){
+    moved = false; guard++;
+    state.notes.forEach(function(n){
+      if(n.id===note.id || attachKey(n.attach)!==attachKey(note.attach)) return;
+      var overlapsX = note.x < n.x+STICKY_W && note.x+STICKY_W > n.x;
+      var overlapsHandleY = note.y < n.y+HANDLE_H && note.y+STICKY_H > n.y;
+      if(overlapsX && overlapsHandleY){ note.y = n.y+HANDLE_H; moved = true; }
+    });
+  }
+  note.y = clamp(note.y, 0, window.innerHeight-STICKY_H);
+}
+function startNoteDrag(e, note){
+  e.preventDefault();
+  note.z = ++noteZCounter;
+  selectedNoteId = note.id;
+  var startX = e.clientX, startY = e.clientY, origX = note.x, origY = note.y;
+  var el = document.querySelector('.sticky-note[data-noteid="'+note.id+'"]');
+  if(el){ el.style.zIndex = note.z; el.classList.add('selected'); }
+  showTrash(true);
+  function onMove(ev){
+    note.x = clamp(origX + (ev.clientX-startX), 0, window.innerWidth-STICKY_W);
+    note.y = clamp(origY + (ev.clientY-startY), 0, window.innerHeight-STICKY_H);
+    if(el){
+      el.style.left = note.x+'px'; el.style.top = note.y+'px';
+      el.classList.toggle('over-trash', isOverTrash(el));
+    }
+  }
+  function onUp(ev){
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    showTrash(false);
+    if(el && isOverTrash(el)){
+      state.notes = state.notes.filter(function(n){ return n.id!==note.id; });
+      selectedNoteId = null;
+      saveNotes();
+      renderStickyLayer();
+    } else {
+      resolveHandleOcclusion(note);
+      if(el){ el.style.left = note.x+'px'; el.style.top = note.y+'px'; el.classList.remove('over-trash'); }
+      debounceSaveNotes();
+    }
+  }
+  // A drag can be interrupted (alt-tab, a context menu popping up mid-drag)
+  // without a pointerup ever firing — without this, the note would be stuck
+  // "mid-drag" with the trash left showing and these window listeners never
+  // cleaned up. Treat a cancel exactly like a normal drop.
+  function onCancel(ev){ onUp(ev); }
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
 }
 function removeNotesOverlay(){
   var existing = document.getElementById('notesOverlayRoot');
@@ -1814,14 +1867,31 @@ function handleClick(e){
     loadDraft(code).then(function(d){
       if(!d){ state.homeError='No draft found for that code. Double check it and try again.'; render(); return; }
       state.draft = d; state.homeError=''; state.screen='setup'; saveStatus='saved'; isDirty=false;
-      state.notes=[]; state.notesOpen=false; state.notesFocusAttach=null; notesDirty=false;
+      state.notes=[]; notesDirty=false; selectedNoteId=null;
       render();
       loadModeration(d.studentName).then(function(m){ state.moderation = m; render(); });
-      loadNotes(d.id).then(function(n){ state.notes = n; render(); });
+      loadNotes(d.id).then(function(n){
+        var needsSave = false;
+        n.forEach(function(note, idx){
+          if(note.x==null || note.y==null){
+            // Legacy note from before freeform positions existed — give it a
+            // sane starting spot instead of rendering at left:NaNpx.
+            note.x = clamp(window.innerWidth - 260 + (idx%4)*14, 0, window.innerWidth-STICKY_W);
+            note.y = clamp(120 + idx*30, 0, window.innerHeight-STICKY_H);
+            note.z = ++noteZCounter;
+            needsSave = true;
+          } else if(note.z > noteZCounter){
+            noteZCounter = note.z; // keep future new notes on top of previously-saved ones
+          }
+        });
+        state.notes = n;
+        if(needsSave) debounceSaveNotes();
+        render();
+      });
     });
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; state.notesOpen=false; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
   if(action==='goInbox'){
     state.screen='inbox';
     if(hasStorage){
@@ -1988,29 +2058,6 @@ function handleClick(e){
     else { renderCoachOverlay(); }
     return;
   }
-  if(action==='toggleNotes'){
-    state.notesOpen=!state.notesOpen;
-    var notesDrawerEl = document.querySelector('.notes-drawer');
-    if(notesDrawerEl){ notesDrawerEl.classList.toggle('open', state.notesOpen); }
-    else { renderNotesOverlay(); }
-    return;
-  }
-  if(action==='openNoteTab'){
-    state.notesFocusAttach = JSON.parse(t.getAttribute('data-attach-json'));
-    state.notesOpen = true;
-    render();
-    return;
-  }
-  if(action==='addNote'){
-    var newNoteAttach = JSON.parse(t.getAttribute('data-attach-json'));
-    var newNoteInputEl = document.getElementById('newNoteText');
-    var newNoteText = newNoteInputEl ? newNoteInputEl.value.trim() : '';
-    if(!newNoteText) return;
-    state.notes.push(newNote(newNoteAttach, newNoteText));
-    debounceSaveNotes();
-    render();
-    return;
-  }
   if(action==='deleteNote'){
     var delNoteId = t.getAttribute('data-noteid');
     state.notes = state.notes.filter(function(n){ return n.id!==delNoteId; });
@@ -2043,30 +2090,24 @@ function handleDragStart(e){
     state.dragLaneIdx = parseInt(t.getAttribute('data-dragidx'),10);
     e.dataTransfer.setData('text/plain','lane');
     t.classList.add('dragging');
-  } else if(kind==='note'){
-    state.dragNoteId = t.getAttribute('data-noteid');
-    e.dataTransfer.setData('text/plain','note');
-    var noteCard = t.closest('.note-card') || t;
-    noteCard.classList.add('dragging');
-    try{ e.dataTransfer.setDragImage(noteCard, 16, 16); }catch(err){}
   }
 }
 function handleDragOver(e){
-  if(state.dragScenarioIdx!==null || state.dragLaneIdx!==null || state.dragNoteId){
+  if(state.dragScenarioIdx!==null || state.dragLaneIdx!==null){
     // A drag we initiated is in progress — always block the browser's default
     // handling so it never falls back to inserting the drag payload as text
     // into whatever input/textarea happens to be under the cursor.
     e.preventDefault();
     return;
   }
-  if(e.target.closest('[data-action="openScenario"]') || e.target.closest('.lane') || e.target.closest('[data-drop-attach]')){
+  if(e.target.closest('[data-action="openScenario"]') || e.target.closest('.lane')){
     e.preventDefault();
   }
 }
 function handleDrop(e){
   var payload;
   try{ payload = e.dataTransfer.getData('text/plain'); }catch(err){ payload=''; }
-  if(payload==='scenario' || payload==='lane' || payload==='note'){
+  if(payload==='scenario' || payload==='lane'){
     // Always suppress the browser's default drop action for our own drag
     // payloads (e.g. text fields inserting the literal word "note"), even
     // when the drop lands somewhere that isn't a recognized target below.
@@ -2094,19 +2135,9 @@ function handleDrop(e){
     debounceSave(); render();
     return;
   }
-  var attachTarget = e.target.closest('[data-drop-attach]');
-  if(attachTarget && payload==='note' && state.dragNoteId){
-    e.preventDefault();
-    var newAttach = JSON.parse(attachTarget.getAttribute('data-drop-attach'));
-    var draggedNote = state.notes.filter(function(n){ return n.id===state.dragNoteId; })[0];
-    if(draggedNote){ draggedNote.attach = newAttach; draggedNote.updatedAt = Date.now(); debounceSaveNotes(); }
-    state.dragNoteId = null;
-    render();
-    return;
-  }
 }
 function handleDragEnd(){
-  state.dragScenarioIdx=null; state.dragLaneIdx=null; state.dragNoteId=null;
+  state.dragScenarioIdx=null; state.dragLaneIdx=null;
   document.querySelectorAll('.dragging').forEach(function(el){ el.classList.remove('dragging'); });
 }
 
@@ -2116,6 +2147,20 @@ document.addEventListener('visibilitychange', function(){
   if(document.visibilityState === 'hidden') flushSave();
 });
 window.addEventListener('pagehide', flushSave);
+// Sticky notes store raw viewport-pixel x/y — if the window shrinks, pull any
+// note back into view rather than leaving it stranded off-screen with no way
+// to reach it.
+window.addEventListener('resize', function(){
+  if(!document.getElementById('notesOverlayRoot')) return;
+  var changed = false;
+  state.notes.forEach(function(n){
+    if(n.x==null || n.y==null) return;
+    var nx = clamp(n.x, 0, window.innerWidth-STICKY_W);
+    var ny = clamp(n.y, 0, window.innerHeight-STICKY_H);
+    if(nx!==n.x || ny!==n.y){ n.x=nx; n.y=ny; changed=true; }
+  });
+  if(changed){ renderStickyLayer(); debounceSaveNotes(); }
+});
 render();
 })();
 </script>
