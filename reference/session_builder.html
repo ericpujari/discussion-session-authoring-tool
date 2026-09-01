@@ -160,7 +160,7 @@
   .page-head h2{color:#fff; font-size:clamp(24px,3vw,30px); margin:6px 0 8px;}
   .page-head p{color:#C7D2DD; font-size:14.5px; max-width:560px; line-height:1.5;}
 
-  .panel{background:var(--paper); border-radius:var(--radius); padding:26px 28px; box-shadow:var(--shadow); margin-bottom:20px;}
+  .panel{background:var(--paper); border-radius:var(--radius); padding:26px 28px; box-shadow:var(--shadow); margin-bottom:20px; container-type:inline-size;}
   .panel h3{font-size:17px; margin-bottom:14px;}
   .row{display:flex; gap:14px;}
   .row > *{flex:1;}
@@ -225,10 +225,25 @@
   .domain-pill.covered{background:rgba(46,139,132,.30); color:#CDEDE9; border-color:rgba(46,139,132,.4);}
 
   /* ---------- Scenario editor ---------- */
-  .lanes{display:flex; gap:14px; margin-bottom:6px; align-items:stretch;}
-  @media (max-width:760px){.lanes{flex-direction:column;}}
+  .lanes{display:grid; grid-template-columns:1fr; gap:14px; margin-bottom:6px;}
+  /* Step the option-card grid up to 2, then 3/4 columns as the panel widens, instead of
+     squeezing every lane into one unwrapped row (which forced lanes past their own
+     min-content width and let them spill past the panel's edge). */
+  @container (min-width:480px){
+    .lanes-2, .lanes-3, .lanes-4{grid-template-columns:repeat(2, minmax(240px,1fr));}
+  }
+  @container (min-width:480px) and (max-width:739.98px){
+    .lanes-3 .lane:last-child{grid-column:1 / -1;} /* odd one out spans full width instead of leaving a dead half-row */
+  }
+  @container (min-width:740px){
+    .lanes-3{grid-template-columns:repeat(3, minmax(240px,1fr));}
+  }
+  @container (min-width:1050px){
+    .lanes-4{grid-template-columns:repeat(4, minmax(240px,1fr));}
+  }
+  .lane, .lane *{min-width:0;}
   .lane{
-    flex:1; border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:9px;
+    border-radius:12px; padding:16px; display:flex; flex-direction:column; gap:9px;
     border-top:6px solid var(--c); background:var(--soft); cursor:grab; position:relative;
   }
   .lane.dragging{opacity:.45;}
@@ -251,8 +266,7 @@
     flex-shrink:0; padding:7px 12px; font-size:12px; font-weight:600; border-radius:8px;
     border:1.5px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
   }
-  .btn-icon-search:hover:not(:disabled){background:rgba(31,41,55,.06);}
-  .btn-icon-search:disabled{opacity:.4; cursor:not-allowed;}
+  .btn-icon-search:hover{background:rgba(31,41,55,.06);}
   .lane input[type=text]{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; font-weight:600;}
   .lane textarea{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; min-height:78px; line-height:1.42; font-size:13.8px;}
   .wc{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-soft); text-align:right;}
@@ -488,9 +502,20 @@
   }
   .pp-h2{font-family:var(--font-display); font-weight:700; font-size:28px; color:#1D3A6E; margin:0;}
   .pp-setup{font-size:16px; line-height:1.5; color:#25303D; max-width:760px; margin:0;}
-  .pp-opts{display:flex; gap:34px; justify-content:center; flex-wrap:wrap; margin-top:8px; width:100%;}
-  .pp-opts-2 .pp-opt, .pp-opts-3 .pp-opt{flex:0 1 220px;}
-  .pp-opt{display:flex; flex-direction:column; align-items:center; gap:12px;}
+  .pp-card{container-type:inline-size;}
+  .pp-opts{display:grid; grid-template-columns:minmax(140px,220px); gap:28px 34px; justify-content:center; margin-top:8px; width:100%;}
+  .pp-opt{display:flex; flex-direction:column; align-items:center; gap:12px; width:100%; max-width:220px;}
+  /* Step column count up as the card widens, so a row is always fully filled instead of
+     flex-wrap dumping a lonely leftover option onto its own row at in-between widths. */
+  @container (min-width:340px){
+    .pp-opts-2, .pp-opts-4{grid-template-columns:repeat(2, minmax(140px,220px));}
+  }
+  @container (min-width:520px){
+    .pp-opts-3{grid-template-columns:repeat(3, minmax(140px,220px));}
+  }
+  @container (min-width:700px){
+    .pp-opts-4{grid-template-columns:repeat(4, minmax(140px,220px));}
+  }
   .pp-opt-icon{
     width:130px; height:130px; border-radius:14px; background:#EDECE7;
     display:flex; align-items:center; justify-content:center;
@@ -498,7 +523,7 @@
   }
   .pp-opt-icon svg{width:56px; height:56px; color:#161616;}
   .pp-opt-icon img{width:76px; height:76px; object-fit:contain;}
-  .pp-opt-cap{font-size:14px; line-height:1.4; color:#25303D; max-width:210px;}
+  .pp-opt-cap{font-size:14px; line-height:1.4; color:#25303D; max-width:100%;}
   .pp-checkopts{display:flex; flex-direction:column; gap:10px; width:100%; max-width:440px; margin-top:6px;}
   .pp-checkopt{background:#EDECE7; border-radius:10px; padding:12px 16px; font-size:14.5px; color:#25303D; text-align:left;}
   .pp-cqbar{
@@ -603,8 +628,7 @@ var AI_ASSISTANT_ENABLED = false;
 /* Master switch for real icon search against the Noun Project, via a serverless proxy
    that holds the API credentials (see /api/noun-project-search.js — the key must never
    reach the browser). Off = the icon description field behaves as before (a design team
-   illustrates it later). Search only unlocks once the whole draft is filled in
-   (draftComplete()), so hunting for icons can't distract from writing the session. */
+   illustrates it later). Available on every option from the start — no completion gate. */
 var ICON_SEARCH_ENABLED = true;
 var ICON_SEARCH_ENDPOINT = '/api/noun-project-search';
 
@@ -980,9 +1004,6 @@ function stepDone(key){
   if(key==='reflection') return !!(d.reflection.question.trim());
   return false;
 }
-function draftComplete(){
-  return stepDone('setup') && stepDone('storyboard') && stepDone('reflection');
-}
 function railHtml(){
   var d = state.draft;
   var rows = STEP_LIST.map(function(s){
@@ -1123,9 +1144,7 @@ function iconGlyphHtml(o){
 }
 function iconSearchBtnHtml(o, scenarioIdx, optionIdx){
   if(!ICON_SEARCH_ENABLED) return '';
-  var locked = !draftComplete();
-  var attrs = 'data-action="openIconSearch" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'"'+
-    (locked ? ' disabled title="Finish every scenario, halftime, and the closing reflection to unlock icon search."' : ' title="Search real icons on the Noun Project"');
+  var attrs = 'data-action="openIconSearch" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Search real icons on the Noun Project"';
   return '<button type="button" class="btn-icon-search" '+attrs+'>'+(o.selectedIcon ? 'Change icon' : 'Search icons')+'</button>';
 }
 function renderScenario(){
@@ -1183,7 +1202,7 @@ function renderScenario(){
   '<div class="panel">'+
     '<h3>Options — drag to reorder, they should feel equally good</h3>'+
     '<div class="hint" style="margin-bottom:12px; font-size:12.5px; color:var(--ink-soft);">For each option, describe the icon you imagine — simple and black-and-white, like the icons real Synthesis sessions use. Our design team will illustrate it.</div>'+
-    '<div class="lanes">'+lanesHtml+'</div>'+
+    '<div class="lanes lanes-'+sc.options.length+'">'+lanesHtml+'</div>'+
     balHtml+
   '</div>'+
   '<div class="panel">'+
