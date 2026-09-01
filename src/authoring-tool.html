@@ -337,7 +337,7 @@
      order among themselves; the trash icon sits above all of it at 9999 so it's
      never accidentally buried under a pile of notes. */
   .note-stack{
-    position:fixed; right:26px; top:50%; transform:translateY(-50%); width:96px; height:96px; z-index:45;
+    position:fixed; right:26px; top:110px; transform:translateY(-50%); width:96px; height:96px; z-index:45;
   }
   .note-stack-sheet{
     position:absolute; inset:0; border-radius:6px; background:#F5E6A8; box-shadow:0 3px 10px rgba(0,0,0,.25);
@@ -350,11 +350,11 @@
   }
   .note-stack-top:active{cursor:grabbing;}
   .note-stack-hint{
-    position:fixed; right:20px; top:calc(50% + 58px); width:110px; text-align:center;
+    position:fixed; right:20px; top:168px; width:110px; text-align:center;
     font-size:11px; color:#C7D2DD; z-index:45; pointer-events:none;
   }
   .note-trash{
-    position:fixed; right:132px; top:50%; transform:translateY(-50%) scale(.8); width:52px; height:52px;
+    position:fixed; right:132px; top:110px; transform:translateY(-50%) scale(.8); width:52px; height:52px;
     border-radius:50%; background:#3a2a1a; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
     font-size:22px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:9999;
   }
