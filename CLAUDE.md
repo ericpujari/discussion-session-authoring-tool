@@ -13,9 +13,9 @@ live structure checker — that:
 - Enforces the fixed session structure (see below) so a writer can't accidentally skip a
   section, mistime a scenario, or mix option counts.
 - Surfaces the style/tone/sensitivity guardrails inline while drafting, so the writer
-  self-checks as they go (similar in spirit to the self-check panel already in
-  `reference/session_builder.html`, but for full session authoring rather than student
-  practice drafts).
+  self-checks as they go (similar in spirit to the self-check panel pattern this project
+  inherited from the student practice tool it was forked from, but for full session
+  authoring rather than student practice drafts).
 - Outputs a clean, correctly formatted session document (matching the structure of the
   files in `reference/sessions/`) that a writer can export/copy for review.
 
@@ -26,10 +26,13 @@ writers') judgment about content.
 ## Who uses it
 
 Synthesis session writers — coaches and learning-team members who write Discussion
-Session scripts. Not the end students. (Students get a *different*, already-built tool:
-see `reference/session_builder.html`, which is a separate, student-facing practice tool
-for ages 8–14 to draft their own mini-sessions for coach review. Don't confuse the two —
-this new tool is for the adults writing the real, deployed sessions.)
+Session scripts. Not the end students. (Students get a *different* tool — a separate,
+student-facing practice tool for ages 8–14 to draft their own mini-sessions for coach
+review. It used to live at `reference/session_builder.html` in this repo but was removed
+after student-facing work accidentally landed there instead of in this authoring tool;
+`src/authoring-tool.html` is its fork and carries the same reusable patterns. Don't
+confuse the two — this authoring tool is for the adults writing the real, deployed
+sessions; student-facing changes don't belong here.)
 
 ## Source of truth for structure and rules
 
@@ -77,10 +80,9 @@ culture.
 - `reference/Discussion_Session_Template.md` — the spec (read first, always)
 - `reference/sessions/*.md` — 9 real, deployed sessions to pattern-match tone and
   structure against. When in doubt about what "matches the voice" means, look here.
-- `reference/session_builder.html` — the existing student-facing drafting tool. Useful for
-  reusable patterns (e.g. the storyboard UI, self-check panel, save-reliability system)
-  but it's a different tool for a different audience — don't merge scope with it unless
-  Eric explicitly asks.
+- `src/authoring-tool.html` was forked from `reference/session_builder.html` (now removed
+  from this repo — see "Who uses it" above) and inherited its reusable patterns: storyboard
+  UI, self-check panel, save-reliability system. Those patterns are the reference now.
 
 ## Architecture conventions (carried over from session_builder.html's patterns)
 
@@ -114,7 +116,8 @@ screens/flow for the authoring interface (see open questions below).
 ## Open questions to resolve with Eric before/while building
 
 - What's the actual drafting flow? E.g.: one long form matching the template top-to-bottom,
-  or a storyboard-style view (like session_builder.html) with per-scenario editing panels?
+  or a storyboard-style view (like `src/authoring-tool.html` already has) with
+  per-scenario editing panels?
 - Does this need multi-user/save-and-resume, or is it single-session-at-a-time (draft,
   export, done)?
 - Export format — Markdown matching the reference sessions' structure? Something else?
