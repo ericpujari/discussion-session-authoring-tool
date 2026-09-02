@@ -96,14 +96,16 @@
   .home-hero .visibility-note{color:#93A2B3; font-size:13px; max-width:460px; margin:12px auto 0;}
   .home-cards{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
   @media (max-width:720px){.home-cards{grid-template-columns:1fr;}}
+  .home-cards.single{display:flex; justify-content:center;}
+  .home-cards.single .home-card{max-width:460px; width:100%;}
   .home-card{
     background:var(--paper); border-radius:var(--radius); padding:28px; box-shadow:var(--shadow);
     border-top:6px solid var(--lane-a);
     position:relative;
   }
-  .home-card.alt{border-top-color:var(--lane-b);}
   .home-card h3{font-size:20px; margin-bottom:6px;}
   .home-card p{color:var(--ink-soft); font-size:14px; margin-bottom:18px; line-height:1.5;}
+  .home-card-actions{display:flex; gap:10px; flex-wrap:wrap;}
   .field{margin-bottom:14px;}
   .field label{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;}
   .field input[type=text], .field textarea, .field select{
@@ -114,6 +116,13 @@
   .field .hint{font-size:12px; color:#8B94A0; margin-top:5px; font-weight:400; text-transform:none; letter-spacing:0;}
   .home-footer-link{display:block; text-align:center; margin-top:36px; color:#C7D2DD; font-size:13.5px; text-decoration:underline; text-underline-offset:3px;}
   .home-footer-link:hover{color:#fff;}
+  .resume-matches{display:flex; flex-direction:column; gap:8px; margin-top:14px;}
+  .resume-match-row{
+    background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:10px 14px; cursor:pointer;
+  }
+  .resume-match-row:hover{border-color:var(--ink-soft);}
+  .resume-match-row h4{font-size:14px; margin:0;}
+  .resume-match-row p{font-size:12px; color:var(--ink-soft); font-family:var(--font-mono); margin:2px 0 0;}
 
   /* ---------- Shell (after a draft is loaded) ---------- */
   .shell{display:flex; min-height:100vh;}
@@ -274,7 +283,7 @@
   }
   .btn-icon-search:hover{background:rgba(31,41,55,.06);}
   .lane input[type=text]{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; font-weight:600;}
-  .lane textarea{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; min-height:78px; line-height:1.42; font-size:13.8px;}
+  .lane textarea{background:#fff; border:1.5px solid var(--line); border-radius:8px; padding:8px 10px; min-height:150px; line-height:1.42; font-size:13.8px;}
   .wc{font-family:var(--font-mono); font-size:10.5px; color:var(--ink-soft); text-align:right;}
 
   .balance-strip{
@@ -301,13 +310,13 @@
   .print-card h2.p-title{font-size:30px; margin:6px 0 10px;}
   .print-card .p-blurb{font-size:15px; line-height:1.6; color:#3c3527; margin-bottom:4px;}
   .p-scenario{padding:18px 0; border-top:1px solid var(--line);}
-  .p-scenario h4{font-size:17px; margin-bottom:6px; display:flex; align-items:baseline; gap:10px;}
-  .p-preview-link{font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--lane-a); cursor:pointer; white-space:nowrap;}
+  .p-scenario h4{font-size:17px; margin-bottom:6px; display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
+  .p-preview-link{font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--lane-a); cursor:pointer; white-space:nowrap; margin-left:auto;}
   .p-preview-link:hover{text-decoration:underline;}
   .p-scenario .p-setup{font-size:14.5px; line-height:1.55; margin-bottom:12px; color:#3c3527;}
   .p-opts{display:flex; flex-direction:column; gap:8px; margin-bottom:12px;}
-  .p-opt{display:flex; gap:10px; align-items:flex-start; padding:10px 12px; border-radius:9px; border-left:5px solid var(--c); background:var(--soft);}
-  .p-opt .p-opt-icon{width:20px; height:20px; flex-shrink:0; color:var(--c);}
+  .p-opt{display:flex; gap:12px; align-items:flex-start; padding:10px 12px; border-radius:9px; border-left:5px solid var(--c); background:var(--soft);}
+  .p-opt .p-opt-icon{width:44px; height:44px; flex-shrink:0; color:var(--c); background:#fff; border-radius:8px; padding:6px; box-shadow:0 1px 4px rgba(0,0,0,.08);}
   .p-opt .p-opt-icon svg{width:100%; height:100%;}
   .p-opt .p-opt-icon img{width:100%; height:100%; object-fit:contain;}
   .p-icon-desc{display:block; font-size:12px; font-style:italic; color:#8a7f5e; margin-top:4px;}
@@ -364,8 +373,16 @@
      turned back on). Individual notes use noteZCounter (starts at 40) for stacking
      order among themselves; the trash icon sits above all of it at 9999 so it's
      never accidentally buried under a pile of notes. */
+  /* The dock sits mostly off-screen (sliver peeking at the right edge) and slides
+     fully into view on hover — see the note pile UX note below. */
+  .note-dock{
+    position:fixed; right:6px; top:110px; width:96px; height:96px; z-index:45;
+    transform:translateY(-50%) translateX(calc(100% - 30px));
+    transition:transform .18s ease;
+  }
+  .note-dock:hover{transform:translateY(-50%) translateX(0);}
   .note-stack{
-    position:fixed; right:26px; top:110px; transform:translateY(-50%); width:96px; height:96px; z-index:45;
+    position:absolute; inset:0;
   }
   .note-stack-sheet{
     position:absolute; inset:0; border-radius:6px; background:#F5E6A8; box-shadow:0 3px 10px rgba(0,0,0,.25);
@@ -378,9 +395,11 @@
   }
   .note-stack-top:active{cursor:grabbing;}
   .note-stack-hint{
-    position:fixed; right:20px; top:168px; width:110px; text-align:center;
-    font-size:11px; color:#C7D2DD; z-index:45; pointer-events:none;
+    position:absolute; top:108px; left:-7px; width:110px; text-align:center;
+    font-size:11px; color:#C7D2DD; pointer-events:none;
+    opacity:0; transition:opacity .15s;
   }
+  .note-dock:hover .note-stack-hint{opacity:1;}
   .note-trash{
     position:fixed; right:132px; top:110px; transform:translateY(-50%) scale(.8); width:52px; height:52px;
     border-radius:50%; background:#3a2a1a; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
@@ -526,9 +545,11 @@
   .pp-cq-label{display:block; font-family:var(--font-mono); font-size:10.5px; letter-spacing:.1em; color:#8A8578; margin-bottom:4px;}
   .pp-cq{flex:1; font-size:15px; color:#2b2b28;}
   .pp-arrow{
-    background:none; border:none; font-size:20px; color:#9A9585; width:28px; height:28px; flex:0 0 auto;
-    border-radius:50%; opacity:.6;
+    background:none; border:none; font-size:20px; color:#5c5748; width:28px; height:28px; flex:0 0 auto;
+    border-radius:50%; cursor:pointer;
   }
+  .pp-arrow:hover:not(:disabled){background:rgba(0,0,0,.06);}
+  .pp-arrow:disabled{opacity:.3; cursor:default;}
   .pp-scenav{
     width:100%; max-width:980px; display:flex; align-items:center; justify-content:space-between;
     margin-top:16px; color:#B9C4D0; font-size:12.5px;
@@ -556,13 +577,7 @@
 'use strict';
 
 /* ============================= DATA ============================= */
-var BASE_DOMAINS = ['Peer / Friendship','Family','School','Team / Group','Synthesis Platform','Other'];
-function allDomains(){
-  var custom = (state.draft && state.draft.customDomains) || [];
-  var list = BASE_DOMAINS.slice();
-  custom.forEach(function(c){ if(list.indexOf(c)===-1) list.push(c); });
-  return list;
-}
+var BASE_DOMAINS = ['Peer / Friendship','Family','School','Team / Group','Business / Entrepreneurship','Health / Medicine','Synthesis Platform','Other'];
 var LANES = [
   {key:'a', color:'var(--lane-a)', soft:'var(--lane-a-soft)', name:'First'},
   {key:'b', color:'var(--lane-b)', soft:'var(--lane-b-soft)', name:'Second'},
@@ -662,11 +677,11 @@ var state = {
   inboxSelectedId: null,
   inboxFlaggedUsername: null,
   homeError: '',
-  addingCustomDomain: false,
+  resumeMatches: [],        // drafts found for the typed username on the "Resume a draft" card
   dragScenarioIdx: null,
   dragLaneIdx: null,
-  ppKind: 'scenario',        // player-preview: which block is being previewed — scenario | halftime | reflection
-  ppScenarioIndex: 0,        // player-preview: which of the 6 scenarios
+  ppStep: 0,                 // player-preview: index into PP_SEQUENCE (scenarios + halftime + reflection, in session order)
+  ppChallengeIndex: 0,       // player-preview: which challenge question is showing (scenario steps only)
   ppReturnScreen: 'scenario', // player-preview: screen to return to on exit
   iconSearchOpen: null,      // {scenarioIndex, optionIndex} while an option's inline search strip is showing
   iconSearchResults: [],
@@ -730,11 +745,11 @@ function timeAgo(ts){
 }
 
 /* ============================= MODEL ============================= */
-function newOption(){ return {id:uid(), label:'', rationale:'', iconDescription:'', selectedIcon:null}; }
+function newOption(colorIndex){ return {id:uid(), label:'', rationale:'', iconDescription:'', selectedIcon:null, colorIndex: colorIndex||0}; }
 function newScenario(){
   var opts = [];
   var n = (state.draft && state.draft.optionCount) || 3;
-  for(var i=0;i<n;i++) opts.push(newOption());
+  for(var i=0;i<n;i++) opts.push(newOption(i));
   return {
     id:uid(), title:'', domain:'', setup:'',
     options: opts,
@@ -755,12 +770,13 @@ function newDraft(name){
     halftime:{question:'', options:['',''], reflection:''},
     reflection:{question:'', options:['',''], reflection:''},
     aiChat: [],
-    coachNotes: []
+    coachNotes: [],
+    coachMessage: ''
   };
   for(var i=0;i<6;i++) d.scenarios.push(newScenario.call(null));
   // rebuild scenarios now that optionCount is set on d (newScenario reads state.draft, so patch directly)
   d.scenarios = d.scenarios.map(function(){
-    var opts=[]; for(var i=0;i<d.optionCount;i++) opts.push(newOption());
+    var opts=[]; for(var i=0;i<d.optionCount;i++) opts.push(newOption(i));
     return {id:uid(), title:'', domain:'', setup:'', options:opts, challenge:['',''], reflection:''};
   });
   return d;
@@ -832,12 +848,14 @@ function patchLegacyDraft(d){
   if(!Array.isArray(d.customDomains)) d.customDomains = [];
   if(!Array.isArray(d.coachNotes)) d.coachNotes = [];
   if(!Array.isArray(d.aiChat)) d.aiChat = [];
+  if(typeof d.coachMessage !== 'string') d.coachMessage = '';
   (d.scenarios||[]).forEach(function(sc){
-    (sc.options||[]).forEach(function(o){
+    (sc.options||[]).forEach(function(o, oi){
       if(typeof o.iconDescription !== 'string'){
         o.iconDescription = o.icon ? (LEGACY_ICON_LABELS[o.icon] || '') : '';
       }
       if(typeof o.selectedIcon === 'undefined') o.selectedIcon = null;
+      if(typeof o.colorIndex !== 'number') o.colorIndex = oi;
     });
   });
   return d;
@@ -959,27 +977,34 @@ function render(){
 
 /* ============================= HOME ============================= */
 function renderHome(){
+  var resumeMatchesHtml = '';
+  if(state.resumeMatches && state.resumeMatches.length){
+    resumeMatchesHtml = '<div class="resume-matches">'+
+      state.resumeMatches.map(function(d){
+        return '<div class="resume-match-row" data-action="openResumeDraft" data-id="'+esc(d.id)+'">'+
+          '<h4>'+esc(d.title||'Untitled')+'</h4><p>updated '+timeAgo(d.updatedAt)+'</p>'+
+        '</div>';
+      }).join('')+
+    '</div>';
+  }
   return ''+
   '<div class="home-wrap">'+
     '<div class="home-hero">'+
       '<div class="glass-pill"><span class="eyebrow">SYNTHESIS · SESSION BUILDER</span></div>'+
       '<h1>Build your own Discussion Session</h1>'+
-      '<p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p>'+
       '<p class="visibility-note">👀 Heads up — coaches and parents can see the sessions you build here.</p>'+
     '</div>'+
     (state.homeError? '<div class="banner">⚠️ '+esc(state.homeError)+'</div>' : '')+
-    '<div class="home-cards">'+
+    '<div class="home-cards single">'+
       '<div class="home-card">'+
-        '<h3>Start a new session</h3>'+
-        '<p>Give yourself a name and we\'ll set up a blank storyboard for you.</p>'+
-        '<div class="field"><label>Username</label><input type="text" id="newName" placeholder="e.g. alex1234"></div>'+
-        '<button class="btn btn-primary" data-action="startNew">Start building →</button>'+
-      '</div>'+
-      '<div class="home-card alt">'+
-        '<h3>Resume a draft</h3>'+
-        '<p>Type the code we gave you last time to pick up right where you left off.</p>'+
-        '<div class="field"><label>Draft code</label><input type="text" id="resumeCode" placeholder="e.g. K7QXM" style="font-family:var(--font-mono); letter-spacing:.08em; text-transform:uppercase;"></div>'+
-        '<button class="btn btn-ghost" data-action="resumeDraft">Open my draft →</button>'+
+        '<h3>Get started</h3>'+
+        '<p>Type your username, then start a brand new session or pick up one you\'ve already begun.</p>'+
+        '<div class="field"><label>Username</label><input type="text" id="username" placeholder="e.g. alex1234"></div>'+
+        '<div class="home-card-actions">'+
+          '<button class="btn btn-primary" data-action="startNew">Start a new session →</button>'+
+          '<button class="btn btn-ghost" data-action="resumeDraft">Find my drafts →</button>'+
+        '</div>'+
+        resumeMatchesHtml+
       '</div>'+
     '</div>'+
     '<a class="home-footer-link" data-action="goInbox">I\'m a coach — open the review inbox →</a>'+
@@ -994,7 +1019,7 @@ var STEP_LIST = [
   {key:'review', label:'Review & send'}
 ];
 function scenarioComplete(sc){
-  return sc.title.trim() && sc.setup.trim() && sc.options.every(function(o){return o.label.trim() && o.rationale.trim();});
+  return sc.title.trim() && sc.setup.trim() && sc.options.every(function(o){return o.rationale.trim();});
 }
 function stepDone(key){
   var d = state.draft;
@@ -1047,7 +1072,7 @@ function renderShellDraft(){
 function renderSetup(){
   var d = state.draft;
   return ''+
-  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">STEP 1</div></div><h2>Set up your session</h2><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
+  '<div class="page-head"><div class="eyebrow">STEP 1</div><h2>Set up your session</h2><p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
   '<div class="panel">'+
     '<div class="field"><label>Title</label><input type="text" data-bind="title" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">A short phrase, often a question. 1-4 words.</div></div>'+
     '<div class="field"><label>Overall idea for this session</label><textarea data-bind="bigIdea" placeholder="What real-life tension does this session explore? Why does it matter to you?" style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">More detail helps — context, examples, why it matters. Every session ends with the same spirit: "'+MANTRA+'"</div></div>'+
@@ -1097,10 +1122,7 @@ function renderStoryboard(){
   var basePills = BASE_DOMAINS.filter(function(x){return x!=='Other';}).map(function(label){
     return '<span class="domain-pill'+(covered[label]?' covered':'')+'">'+(covered[label]?'✓':'•')+' '+esc(label)+'</span>';
   });
-  var customPills = (d.customDomains||[]).filter(function(c){return covered[c];}).map(function(label){
-    return '<span class="domain-pill covered">✓ '+esc(label)+'</span>';
-  });
-  var pills = basePills.concat(customPills).join('');
+  var pills = basePills.join('');
 
   return ''+
   '<div class="page-head"><div class="eyebrow">STEP 2</div><h2>Your storyboard</h2><p>Drag the scenario cards to set their order. Click any card to write it — the halftime card always stays put, right after scenario 3.</p></div>'+
@@ -1117,7 +1139,7 @@ function renderStoryboard(){
       '</div>'+
     '</div>'+
     '<div class="board-grid">'+cards+'</div>'+
-    '<div class="domain-panel"><h4>Domain check — try to spread across a few of these</h4><div class="domain-list">'+pills+'</div><div style="font-size:11.5px; color:#8B98A6; margin-top:8px;">Don\'t see the right fit? Add your own domain from inside a scenario.</div></div>'+
+    '<div class="domain-panel"><h4>Domain check — try to spread across a few of these</h4><div class="domain-list">'+pills+'</div></div>'+
   '</div>'+
   '<details class="guardrail-box"><summary>Remember: the Balance Test</summary><ul>'+
     '<li>Every option should have a real reason to choose it.</li>'+
@@ -1143,10 +1165,11 @@ function iconSearchBtnHtml(scenarioIdx, optionIdx){
 }
 function renderScenario(){
   var d = state.draft, i = state.scenarioIndex, sc = d.scenarios[i];
-  var domainOpts = allDomains().map(function(label){return '<option value="'+esc(label)+'"'+(sc.domain===label?' selected':'')+'>'+esc(label)+'</option>';}).join('');
-  domainOpts += '<option value="__add_new__">+ Add a new domain…</option>';
+  var domainList = BASE_DOMAINS.slice();
+  if(sc.domain && domainList.indexOf(sc.domain)===-1) domainList.push(sc.domain); // legacy custom domain from before the picker was fixed
+  var domainOpts = domainList.map(function(label){return '<option value="'+esc(label)+'"'+(sc.domain===label?' selected':'')+'>'+esc(label)+'</option>';}).join('');
   var lanesHtml = sc.options.map(function(o,oi){
-    var lane = LANES[oi];
+    var lane = LANES[o.colorIndex];
     return ''+
     '<div class="lane" style="--c:'+lane.color+'; --soft:'+lane.soft+'" draggable="true" data-drag="lane" data-dragidx="'+oi+'">'+
       '<div class="lane-head"><span class="lane-tag">Option '+(oi+1)+'</span>'+
@@ -1157,17 +1180,11 @@ function renderScenario(){
       '</div>'+
       '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an icon, e.g. shield">'+iconSearchBtnHtml(i, oi)+'</div>'+
       iconSearchStripHtml(o, i, oi)+
-      '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Option label">'+
+      '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Label (optional)">'+
       '<textarea data-bind="option.rationale" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
       '<div class="wc">'+wordCount(o.rationale)+' words</div>'+
     '</div>';
   }).join('');
-
-  var balHtml = '<div class="balance-strip"><div class="bs-title"><span class="b-icon">⚖️</span>Balance self-check</div><ul>'+
-    '<li>Does every option have its own real reason behind it?</li>'+
-    '<li>If your friend picked an option you didn\'t pick, would you understand why they thought that way?</li>'+
-    '<li>Are there words in any of the options that make it sound obviously smarter, safer, or kinder than the rest?</li>'+
-  '</ul></div>';
 
   var chQ = sc.challenge.map(function(q,qi){
     return '<div class="qrow"><input type="text" data-bind="challenge" data-qidx="'+qi+'" value="'+esc(q)+'" placeholder="Challenge question '+(qi+1)+'">'+
@@ -1176,27 +1193,18 @@ function renderScenario(){
   }).join('');
 
   return ''+
-  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:4px;"><div class="glass-pill"><span class="eyebrow">SCENARIO '+(i+1)+' OF 6</span></div><button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="scenario" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>'+esc(sc.title||'Untitled scenario')+'</h2><p>Real sessions run about 4 minutes per scenario. Setup is 1-3 sentences, second person, ending in a question.</p></div>'+
+  '<div class="page-head"><div class="eyebrow">SCENARIO '+(i+1)+' OF 6</div><h2>'+esc(sc.title||'Untitled scenario')+'</h2><p>Real sessions run about 4 minutes per scenario. Setup is 1-3 sentences, second person, ending in a question.</p></div>'+
   '<div class="panel">'+
     '<div class="row">'+
       '<div class="field"><label>Scenario title</label><input type="text" data-bind="scTitle" value="'+esc(sc.title)+'" placeholder="e.g. The Group Project"></div>'+
-      '<div class="field"><label>Domain</label><select data-bind="scDomain"><option value="">Choose one…</option>'+domainOpts+'</select>'+
-        (state.addingCustomDomain ? (
-          '<div style="display:flex; gap:8px; margin-top:8px;">'+
-            '<input type="text" id="newDomainInput" placeholder="e.g. Sports, Online Gaming" style="flex:1; padding:9px 11px; border-radius:8px; border:1.5px solid var(--line);">'+
-            '<button class="btn btn-primary btn-small" data-action="addCustomDomain">Add</button>'+
-            '<button class="btn btn-ghost btn-small" data-action="cancelCustomDomain">Cancel</button>'+
-          '</div>'
-        ) : '')+
-      '</div>'+
+      '<div class="field"><label>Domain</label><select data-bind="scDomain"><option value="">Choose one…</option>'+domainOpts+'</select></div>'+
     '</div>'+
-    '<div class="field"><label>Setup</label><textarea data-bind="scSetup" placeholder="You are... What do you do? Why?">'+esc(sc.setup)+'</textarea></div>'+
+    '<div class="field"><label>Setup</label><textarea data-bind="scSetup" placeholder="You are... What do you do? Why?" style="min-height:170px;">'+esc(sc.setup)+'</textarea></div>'+
   '</div>'+
   '<div class="panel">'+
     '<h3>Options — drag to reorder, they should feel equally good</h3>'+
     '<div class="hint" style="margin-bottom:12px; font-size:12.5px; color:var(--ink-soft);">For each option, describe the icon you imagine — simple and black-and-white, like the icons real Synthesis sessions use. Our design team will illustrate it.</div>'+
     '<div class="lanes lanes-'+sc.options.length+'">'+lanesHtml+'</div>'+
-    balHtml+
   '</div>'+
   '<div class="panel">'+
     '<h3>Challenge questions</h3>'+
@@ -1206,7 +1214,7 @@ function renderScenario(){
   '</div>'+
   '<div class="scenario-nav">'+
     '<button class="btn btn-ghost-light" data-action="prevScenario" '+(i===0?'disabled':'')+'>← Scenario '+i+'</button>'+
-    (AI_ASSISTANT_ENABLED? '<button class="btn btn-ghost-light" data-action="askCoachScenario">💬 Ask my assistant about this scenario</button>' : '')+
+    '<button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="scenario">🖥️ Preview as students will see it</button>'+
     (i<5? '<button class="btn btn-primary" data-action="nextScenario">Scenario '+(i+2)+' →</button>' : '<button class="btn btn-primary" data-action="nav" data-target="storyboard">Back to storyboard →</button>')+
   '</div>';
 }
@@ -1215,7 +1223,7 @@ function renderScenario(){
 function renderHalftimeEditor(){
   var d = state.draft, h = d.halftime;
   return ''+
-  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">HALFTIME · AFTER SCENARIO 3</div><button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="halftime" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>Halftime check-in</h2><p>A short pulse-check, not a 7th scenario. This card always stays put on the storyboard.</p></div>'+
+  '<div class="page-head"><div class="eyebrow">HALFTIME · AFTER SCENARIO 3</div><h2>Halftime check-in</h2><p>A short pulse-check, not a 7th scenario. This card always stays put on the storyboard.</p></div>'+
   '<div class="panel">'+
     '<div class="field"><label>Halftime question</label><textarea data-bind="halftimeQ" placeholder="e.g. How much are you contributing so far?">'+esc(h.question)+'</textarea></div>'+
     '<label style="display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Options</label>'+
@@ -1224,6 +1232,7 @@ function renderHalftimeEditor(){
   '</div>'+
   '<div style="display:flex; gap:10px; justify-content:space-between;">'+
     '<button class="btn btn-ghost-light" data-action="nav" data-target="storyboard">← Back to storyboard</button>'+
+    '<button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="halftime">🖥️ Preview as students will see it</button>'+
     '<button class="btn btn-primary" data-action="nav" data-target="reflection">Next: closing reflection →</button>'+
   '</div>';
 }
@@ -1241,7 +1250,7 @@ function renderOptionsEditor(obj, kind){
 function renderReflection(){
   var d = state.draft, r = d.reflection;
   return ''+
-  '<div class="page-head"><div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><div class="eyebrow">STEP 3</div><button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="reflection" style="margin-left:auto;">👁 Preview as students will see it</button></div><h2>Closing reflection</h2><p>What do you want people to consider as the session ends?</p></div>'+
+  '<div class="page-head"><div class="eyebrow">STEP 3</div><h2>Closing reflection</h2><p>What do you want people to consider as the session ends?</p></div>'+
   '<div class="panel">'+
     '<div class="field"><label>Closing question</label><textarea data-bind="reflectionQ" placeholder="e.g. Which skill matters more overall?">'+esc(r.question)+'</textarea></div>'+
     '<label style="display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Options</label>'+
@@ -1250,11 +1259,33 @@ function renderReflection(){
   '</div>'+
   '<div style="display:flex; gap:10px; justify-content:space-between;">'+
     '<button class="btn btn-ghost-light" data-action="nav" data-target="storyboard">← Back to storyboard</button>'+
+    '<button class="btn btn-ghost-light btn-small" data-action="openPlayerPreview" data-kind="reflection">🖥️ Preview as students will see it</button>'+
     '<button class="btn btn-primary" data-action="nav" data-target="review">Next: review &amp; send →</button>'+
   '</div>';
 }
 
 /* ---------- Player preview (real Discussion Session look) ---------- */
+// The full click-through order a student actually experiences: scenarios 1-3, the
+// halftime check-in, scenarios 4-6, then the closing reflection.
+var PP_SEQUENCE = [
+  {kind:'scenario', i:0}, {kind:'scenario', i:1}, {kind:'scenario', i:2},
+  {kind:'halftime'},
+  {kind:'scenario', i:3}, {kind:'scenario', i:4}, {kind:'scenario', i:5},
+  {kind:'reflection'}
+];
+function ppStepLabel(entry){
+  if(entry.kind==='scenario') return 'Scenario '+(entry.i+1);
+  if(entry.kind==='halftime') return 'Halftime';
+  return 'Closing Reflection';
+}
+function ppStepForKind(kind, idx){
+  for(var s=0; s<PP_SEQUENCE.length; s++){
+    var entry = PP_SEQUENCE[s];
+    if(entry.kind!==kind) continue;
+    if(kind!=='scenario' || entry.i===idx) return s;
+  }
+  return 0;
+}
 function renderPPScenario(sc, i){
   var optsHtml = sc.options.map(function(o){
     var iconHtml = o.selectedIcon
@@ -1264,12 +1295,14 @@ function renderPPScenario(sc, i){
     var rationale = o.rationale.trim();
     return '<div class="pp-opt"><div class="pp-opt-icon">'+iconHtml+'</div><div class="pp-opt-cap"><b>'+esc(label)+'</b>'+(rationale? ': '+esc(rationale):'')+'</div></div>';
   }).join('');
-  var cq = sc.challenge.filter(function(q){return q.trim();})[0] || '';
+  var cqs = sc.challenge.filter(function(q){return q.trim();});
+  var cqIdx = clamp(state.ppChallengeIndex, 0, Math.max(0, cqs.length-1));
+  var cq = cqs[cqIdx] || '';
   return ''+
   '<h2 class="pp-h2">Scenario '+(i+1)+': '+esc(sc.title||'Untitled Scenario')+'</h2>'+
   '<p class="pp-setup">'+esc(sc.setup||'(setup not written yet)')+'</p>'+
   '<div class="pp-opts pp-opts-'+sc.options.length+'">'+optsHtml+'</div>'+
-  (cq ? '<div class="pp-cqbar"><button class="pp-arrow" disabled>‹</button><div class="pp-cq"><span class="pp-cq-label">CHALLENGE QUESTION</span>'+esc(cq)+'</div><button class="pp-arrow" disabled>›</button></div>' : '');
+  (cq ? '<div class="pp-cqbar"><button class="pp-arrow" data-action="ppPrevCq"'+(cqIdx===0?' disabled':'')+'>‹</button><div class="pp-cq"><span class="pp-cq-label">CHALLENGE QUESTION '+(cqIdx+1)+' / '+cqs.length+'</span>'+esc(cq)+'</div><button class="pp-arrow" data-action="ppNextCq"'+(cqIdx===cqs.length-1?' disabled':'')+'>›</button></div>' : '');
 }
 function renderPPCheckin(block, headerLabel){
   var opts = (block.options||[]).filter(function(o){return o.trim();});
@@ -1281,13 +1314,14 @@ function renderPPCheckin(block, headerLabel){
   (block.reflection? '<div class="pp-cqbar"><div class="pp-cq"><span class="pp-cq-label">'+(headerLabel==='Halftime'?'LOOKING AHEAD':'REFLECTION')+'</span>'+esc(block.reflection)+'</div></div>' : '');
 }
 function renderPlayerPreview(){
-  var d = state.draft, kind = state.ppKind;
+  var d = state.draft;
+  var step = clamp(state.ppStep, 0, PP_SEQUENCE.length-1);
+  var entry = PP_SEQUENCE[step];
   var title = d.title || 'Untitled Session';
-  var body, i;
-  if(kind==='scenario'){
-    i = Math.max(0, Math.min(5, state.ppScenarioIndex));
-    body = renderPPScenario(d.scenarios[i], i);
-  } else if(kind==='halftime'){
+  var body;
+  if(entry.kind==='scenario'){
+    body = renderPPScenario(d.scenarios[entry.i], entry.i);
+  } else if(entry.kind==='halftime'){
     body = renderPPCheckin(d.halftime, 'Halftime');
   } else {
     body = renderPPCheckin(d.reflection, 'Closing Reflection');
@@ -1298,13 +1332,12 @@ function renderPlayerPreview(){
       '<button class="pp-exit" data-action="closePlayerPreview">✕ Exit preview</button>'+
     '</div>'+
     '<div class="pp-stage"><div class="pp-card">'+body+'</div></div>'+
-    (kind==='scenario' ? ''+
-      '<div class="pp-scenav">'+
-        '<button class="pp-navbtn" data-action="ppPrevScenario"'+(i===0?' disabled':'')+'>← Scenario '+i+'</button>'+
-        '<span>Previewing scenario '+(i+1)+' of 6</span>'+
-        '<button class="pp-navbtn" data-action="ppNextScenario"'+(i===5?' disabled':'')+'>Scenario '+(i+2)+' →</button>'+
-      '</div>' : '')+
-    '<div class="pp-progress-track"><div class="pp-progress-fill" style="width:'+(kind==='scenario'? Math.round(((i+1)/6)*100) : kind==='halftime'? 50 : 100)+'%"></div></div>'+
+    '<div class="pp-scenav">'+
+      '<button class="pp-navbtn" data-action="ppPrevStep"'+(step===0?' disabled':'')+'>← '+(step>0? ppStepLabel(PP_SEQUENCE[step-1]) : '')+'</button>'+
+      '<span>Previewing '+ppStepLabel(entry)+' — '+(step+1)+' of '+PP_SEQUENCE.length+'</span>'+
+      '<button class="pp-navbtn" data-action="ppNextStep"'+(step===PP_SEQUENCE.length-1?' disabled':'')+'>'+(step<PP_SEQUENCE.length-1? ppStepLabel(PP_SEQUENCE[step+1]) : '')+' →</button>'+
+    '</div>'+
+    '<div class="pp-progress-track"><div class="pp-progress-fill" style="width:'+Math.round(((step+1)/PP_SEQUENCE.length)*100)+'%"></div></div>'+
   '</div>';
 }
 
@@ -1312,14 +1345,14 @@ function renderPlayerPreview(){
 function renderReviewPreview(d){
   var scenarioBlocks = d.scenarios.map(function(sc,i){
     var opts = sc.options.map(function(o,oi){
-      var lane = LANES[oi];
+      var lane = LANES[o.colorIndex];
       var iconHtml = o.selectedIcon
         ? '<img src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'
         : ICON_PLACEHOLDER_SVG;
       return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b><span>'+esc(o.rationale)+'</span>'+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+'</div></div>';
     }).join('');
     var cqs = sc.challenge.filter(function(q){return q.trim();}).map(function(q){return '<div>'+esc(q)+'</div>';}).join('');
-    var block = '<div class="p-scenario"><h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">👁 Preview</span></h4>'+
+    var block = '<div class="p-scenario"><h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">🖥️ Preview</span></h4>'+
       '<div class="p-setup">'+esc(sc.setup)+'</div>'+
       '<div class="p-opts">'+opts+'</div>'+
       (cqs? '<div class="p-q-label">Challenge questions</div><div class="p-cqs">'+cqs+'</div>' : '')+
@@ -1344,6 +1377,13 @@ function renderReviewPreview(d){
     reflectionBlock+
   '</div>';
 }
+function balanceStripHtml(){
+  return '<div class="panel"><div class="balance-strip"><div class="bs-title"><span class="b-icon">⚖️</span>Balance self-check</div><ul>'+
+    '<li>Does every option have its own real reason behind it?</li>'+
+    '<li>If your friend picked an option you didn\'t pick, would you understand why they thought that way?</li>'+
+    '<li>Are there words in any of the options that make it sound obviously smarter, safer, or kinder than the rest?</li>'+
+  '</ul></div></div>';
+}
 function renderReview(){
   var d = state.draft;
   var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
@@ -1358,6 +1398,11 @@ function renderReview(){
   '<div style="margin-bottom:14px;"><span class="status-badge '+statusCls+'">'+statusLabel+'</span></div>'+
   renderReviewPreview(d)+
   notes+
+  balanceStripHtml()+
+  '<div class="panel">'+
+    '<h3>Message to your coach</h3>'+
+    '<div class="field"><textarea data-bind="coachMessage" placeholder="What would you like coach input on?">'+esc(d.coachMessage)+'</textarea></div>'+
+  '</div>'+
   '<div class="panel">'+
     '<h3>Ready?</h3>'+
     '<div class="review-actions">'+
@@ -1450,6 +1495,7 @@ function renderShellInboxDraft(){
       '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'">⬇ Download as Markdown</button>'+
     '</div>'+
     renderReviewPreview(d)+
+    (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
     '<div class="panel">'+
       '<h3>Leave feedback for '+esc(d.studentName)+'</h3>'+
@@ -1550,11 +1596,13 @@ function renderStickyLayer(){
   var attach = currentAttachForScreen();
   var notes = notesFor(attach);
   var html = ''+
-    '<div class="note-stack">'+
-      '<div class="note-stack-sheet"></div><div class="note-stack-sheet"></div>'+
-      '<div class="note-stack-sheet note-stack-top" id="noteStackTop">+</div>'+
+    '<div class="note-dock">'+
+      '<div class="note-stack">'+
+        '<div class="note-stack-sheet"></div><div class="note-stack-sheet"></div>'+
+        '<div class="note-stack-sheet note-stack-top" id="noteStackTop">+</div>'+
+      '</div>'+
+      '<div class="note-stack-hint">Drag or click to grab a note</div>'+
     '</div>'+
-    '<div class="note-stack-hint">Drag or click to grab a note</div>'+
     '<div class="note-trash" id="noteTrash" title="Drag a note here to throw it away">🗑️</div>'+
     notes.map(renderStickyNote).join('');
 
@@ -1836,6 +1884,12 @@ function toMarkdown(d){
   lines.push('');
   lines.push('> Staff: use this to write the official Parent blurb (closing with: "'+MANTRA+'") and the Alex/Florence intro.');
   lines.push('');
+  if((d.coachMessage||'').trim()){
+    lines.push('## Message to coach');
+    lines.push('');
+    lines.push(d.coachMessage.trim());
+    lines.push('');
+  }
   lines.push('## Portal Image');
   lines.push('');
   lines.push('[Portal image placeholder]');
@@ -1919,6 +1973,7 @@ function updateDraftField(bind, el, oidx, qidx){
   else if(bind==='reflectionQ') d.reflection.question=v;
   else if(bind==='reflectionRefl') d.reflection.reflection=v;
   else if(bind==='reflectionOpt') d.reflection.options[oidx]=v;
+  else if(bind==='coachMessage') d.coachMessage=v;
 }
 
 function attachGlobalHandlers(){
@@ -1936,23 +1991,11 @@ function attachGlobalHandlers(){
   app.querySelectorAll('select[data-bind]').forEach(function(el){
     el.addEventListener('change', function(){
       var bind = el.getAttribute('data-bind');
-      if(bind==='scDomain' && el.value==='__add_new__'){
-        state.addingCustomDomain = true;
-        render();
-        setTimeout(function(){ var inp=document.getElementById('newDomainInput'); if(inp) inp.focus(); }, 0);
-        return;
-      }
       updateDraftField(bind, el, null, null);
       debounceSave();
       render();
     });
   });
-  var newDomainInput = document.getElementById('newDomainInput');
-  if(newDomainInput){
-    newDomainInput.addEventListener('keydown', function(e){
-      if(e.key==='Enter'){ e.preventDefault(); var btn=document.querySelector('[data-action="addCustomDomain"]'); if(btn) btn.click(); }
-    });
-  }
 }
 function attachAppDelegatesOnce(){
   app.addEventListener('click', handleClick);
@@ -1981,18 +2024,46 @@ function sendAppealFromInput(){
   render();
 }
 
+// Opens an already-loaded draft: resets save/notes state, enters the shell, then
+// fills in moderation + notes asynchronously. Shared by "start new" and "resume".
+function enterDraft(d){
+  state.draft = d; state.homeError=''; state.screen='setup'; saveStatus='saved'; isDirty=false;
+  state.notes=[]; notesDirty=false; selectedNoteId=null; state.resumeMatches=[];
+  render();
+  loadModeration(d.studentName).then(function(m){ state.moderation = m; render(); });
+  loadNotes(d.id).then(function(n){
+    var needsSave = false;
+    n.forEach(function(note, idx){
+      if(note.x==null || note.y==null){
+        // Legacy note from before freeform positions existed — give it a
+        // sane starting spot instead of rendering at left:NaNpx.
+        note.x = clamp(window.innerWidth - 260 + (idx%4)*14, 0, window.innerWidth-STICKY_W);
+        note.y = clamp(120 + idx*30, 0, window.innerHeight-STICKY_H);
+        note.z = ++noteZCounter;
+        needsSave = true;
+      } else if(note.z > noteZCounter){
+        noteZCounter = note.z; // keep future new notes on top of previously-saved ones
+      }
+    });
+    state.notes = n;
+    if(needsSave) debounceSaveNotes();
+    render();
+  });
+}
+
 function handleClick(e){
   var t = e.target.closest('[data-action]');
   if(!t) return;
   var action = t.getAttribute('data-action');
 
   if(action==='startNew'){
-    var nameEl = document.getElementById('newName');
+    var nameEl = document.getElementById('username');
     var name = nameEl ? nameEl.value.trim() : '';
     if(!name){ state.homeError='Type a username to get started.'; render(); return; }
     state.draft = newDraft(name);
     state.notes = [];
     state.homeError='';
+    state.resumeMatches=[];
     state.screen='setup';
     saveDraft();
     render();
@@ -2000,38 +2071,26 @@ function handleClick(e){
     return;
   }
   if(action==='resumeDraft'){
-    var codeEl = document.getElementById('resumeCode');
-    var code = codeEl ? codeEl.value.trim() : '';
-    if(!code){ state.homeError='Type your draft code.'; render(); return; }
+    var nameEl2 = document.getElementById('username');
+    var uname = nameEl2 ? nameEl2.value.trim() : '';
+    if(!uname){ state.homeError='Type your username.'; state.resumeMatches=[]; render(); return; }
     if(!hasStorage){ state.homeError='Saving isn\'t available in this preview, so drafts can\'t be resumed.'; render(); return; }
-    loadDraft(code).then(function(d){
-      if(!d){ state.homeError='No draft found for that code. Double check it and try again.'; render(); return; }
-      state.draft = d; state.homeError=''; state.screen='setup'; saveStatus='saved'; isDirty=false;
-      state.notes=[]; notesDirty=false; selectedNoteId=null;
-      render();
-      loadModeration(d.studentName).then(function(m){ state.moderation = m; render(); });
-      loadNotes(d.id).then(function(n){
-        var needsSave = false;
-        n.forEach(function(note, idx){
-          if(note.x==null || note.y==null){
-            // Legacy note from before freeform positions existed — give it a
-            // sane starting spot instead of rendering at left:NaNpx.
-            note.x = clamp(window.innerWidth - 260 + (idx%4)*14, 0, window.innerWidth-STICKY_W);
-            note.y = clamp(120 + idx*30, 0, window.innerHeight-STICKY_H);
-            note.z = ++noteZCounter;
-            needsSave = true;
-          } else if(note.z > noteZCounter){
-            noteZCounter = note.z; // keep future new notes on top of previously-saved ones
-          }
-        });
-        state.notes = n;
-        if(needsSave) debounceSaveNotes();
-        render();
-      });
+    var wantedName = normalizeUsername(uname);
+    listAllDrafts().then(function(list){
+      var matches = list.filter(function(d){ return normalizeUsername(d.studentName)===wantedName; });
+      if(!matches.length){ state.homeError='No sessions found for that username. Check the spelling, or start a new one.'; state.resumeMatches=[]; render(); return; }
+      state.homeError=''; state.resumeMatches=matches; render();
     });
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
+  if(action==='openResumeDraft'){
+    var resumeId = t.getAttribute('data-id');
+    var chosen = state.resumeMatches.filter(function(d){ return d.id===resumeId; })[0];
+    if(!chosen) return;
+    enterDraft(chosen);
+    return;
+  }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
   if(action==='goInbox'){
     state.screen='inbox';
     if(hasStorage){
@@ -2102,16 +2161,18 @@ function handleClick(e){
 
   if(!state.draft) return; // remaining actions require a loaded draft
 
-  if(action==='nav'){ state.screen = t.getAttribute('data-target'); state.addingCustomDomain=false; render(); return; }
-  if(action==='openScenario'){ state.scenarioIndex = parseInt(t.getAttribute('data-idx'),10); state.screen='scenario'; state.addingCustomDomain=false; render(); return; }
+  if(action==='nav'){ state.screen = t.getAttribute('data-target'); render(); return; }
+  if(action==='openScenario'){ state.scenarioIndex = parseInt(t.getAttribute('data-idx'),10); state.screen='scenario'; render(); return; }
   if(action==='openHalftime'){ state.screen='halftimeEditor'; render(); return; }
-  if(action==='prevScenario'){ if(state.scenarioIndex>0){ state.scenarioIndex--; state.addingCustomDomain=false; render(); } return; }
-  if(action==='nextScenario'){ if(state.scenarioIndex<5){ state.scenarioIndex++; state.addingCustomDomain=false; render(); } return; }
+  if(action==='prevScenario'){ if(state.scenarioIndex>0){ state.scenarioIndex--; render(); } return; }
+  if(action==='nextScenario'){ if(state.scenarioIndex<5){ state.scenarioIndex++; render(); } return; }
 
   if(action==='openPlayerPreview'){
-    state.ppKind = t.getAttribute('data-kind');
+    var ppKindAttr = t.getAttribute('data-kind');
     var ppIdxAttr = t.getAttribute('data-idx');
-    state.ppScenarioIndex = ppIdxAttr!==null ? parseInt(ppIdxAttr,10) : state.scenarioIndex;
+    var ppIdx = ppIdxAttr!==null ? parseInt(ppIdxAttr,10) : state.scenarioIndex;
+    state.ppStep = ppStepForKind(ppKindAttr, ppIdx);
+    state.ppChallengeIndex = 0;
     state.ppReturnScreen = state.screen;
     state.screen = 'playerPreview';
     render(); return;
@@ -2146,8 +2207,10 @@ function handleClick(e){
     render();
     return;
   }
-  if(action==='ppPrevScenario'){ if(state.ppScenarioIndex>0){ state.ppScenarioIndex--; render(); } return; }
-  if(action==='ppNextScenario'){ if(state.ppScenarioIndex<5){ state.ppScenarioIndex++; render(); } return; }
+  if(action==='ppPrevStep'){ if(state.ppStep>0){ state.ppStep--; state.ppChallengeIndex=0; render(); } return; }
+  if(action==='ppNextStep'){ if(state.ppStep<PP_SEQUENCE.length-1){ state.ppStep++; state.ppChallengeIndex=0; render(); } return; }
+  if(action==='ppPrevCq'){ if(state.ppChallengeIndex>0){ state.ppChallengeIndex--; render(); } return; }
+  if(action==='ppNextCq'){ state.ppChallengeIndex++; render(); return; }
 
   if(action==='setOptionCount'){
     var n = parseInt(t.getAttribute('data-n'),10);
@@ -2157,26 +2220,11 @@ function handleClick(e){
     }
     state.draft.optionCount = n;
     state.draft.scenarios.forEach(function(sc){
-      var opts=[]; for(var i=0;i<n;i++) opts.push(sc.options[i] || newOption());
+      var opts=[]; for(var i=0;i<n;i++) opts.push(sc.options[i] || newOption(i));
       sc.options = opts;
     });
     debounceSave(); render(); return;
   }
-
-
-  if(action==='addCustomDomain'){
-    var inp = document.getElementById('newDomainInput');
-    var val = inp ? inp.value.trim() : '';
-    if(!val){ if(inp) inp.focus(); return; }
-    var d0 = state.draft;
-    d0.customDomains = d0.customDomains || [];
-    var already = d0.customDomains.concat(BASE_DOMAINS).some(function(x){ return x.toLowerCase()===val.toLowerCase(); });
-    if(!already) d0.customDomains.push(val);
-    d0.scenarios[state.scenarioIndex].domain = val;
-    state.addingCustomDomain = false;
-    debounceSave(); render(); return;
-  }
-  if(action==='cancelCustomDomain'){ state.addingCustomDomain = false; render(); return; }
 
   if(action==='moveLane'){
     var idx = parseInt(t.getAttribute('data-idx'),10), dir = parseInt(t.getAttribute('data-dir'),10);
