@@ -4,7 +4,7 @@
   "private": true,
   "description": "Serverless backend for the Discussion Session tools (Noun Project icon search proxy, draft storage).",
   "dependencies": {
-    "@upstash/redis": "^1.38.3",
-    "oauth-1.0a": "^2.2.6"
+    "oauth-1.0a": "^2.2.6",
+    "redis": "^6.2.1"
   }
 }

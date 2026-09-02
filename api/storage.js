@@ -10,29 +10,39 @@
 // silently no-op. This endpoint plus the client shim give it a real backend.
 //
 // Required setup (not something this code can do for you):
-//   In the Vercel dashboard, open this project > Storage > Marketplace Database >
-//   add a Redis integration (Upstash). That auto-injects the env vars below and
-//   this endpoint picks them up automatically — no manual env var entry needed.
+//   In the Vercel dashboard, add a Redis database to this project (Storage tab, or
+//   vercel.com/marketplace?category=storage) and connect it to this project. That
+//   auto-injects REDIS_URL, which this endpoint reads.
+//
+// Uses the standard `redis` (node-redis) client over a TCP connection — the
+// package and env var name Vercel's own dashboard quickstart points to for its
+// Redis integration. The connected client is cached at module scope so a warm
+// serverless instance reuses one connection across invocations instead of
+// reconnecting on every request.
 //
 // Required env vars (auto-injected by the integration above):
-//   KV_REST_API_URL
-//   KV_REST_API_TOKEN
+//   REDIS_URL
 //
 // Request contract: POST { op: 'get'|'set'|'list', key, value? }
 //   get  -> { value: string } | null
 //   set  -> { ok: true }  (value must be a string — callers JSON.stringify first)
 //   list -> { keys: string[] }  (key doubles as the prefix to match)
 
-const { Redis } = require('@upstash/redis');
+const { createClient } = require('redis');
 
+let clientPromise = null;
 function getClient() {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
-  if (!url || !token) return null;
-  // Values passed in are already JSON strings (the app does its own
-  // JSON.stringify/parse) — disable the client's own auto (de)serialization so
-  // get() hands back the exact string that was set(), not a re-parsed object.
-  return new Redis({ url, token, automaticDeserialization: false });
+  const url = process.env.REDIS_URL;
+  if (!url) return null;
+  if (!clientPromise) {
+    const client = createClient({ url });
+    client.on('error', (err) => console.error('Redis connection error', err));
+    clientPromise = client.connect().then(() => client).catch((err) => {
+      clientPromise = null; // let the next request retry instead of staying broken forever
+      throw err;
+    });
+  }
+  return clientPromise;
 }
 
 module.exports = async (req, res) => {
@@ -41,11 +51,19 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const redis = getClient();
-  if (!redis) {
-    res.status(500).json({
-      error: 'Storage is not configured. In the Vercel dashboard, add a Redis database to this project (Project Settings > Storage) and redeploy.',
-    });
+  let redis;
+  try {
+    const client = await getClient();
+    if (!client) {
+      res.status(500).json({
+        error: 'Storage is not configured. In the Vercel dashboard, add a Redis database to this project (Storage tab) and redeploy.',
+      });
+      return;
+    }
+    redis = client;
+  } catch (e) {
+    console.error('storage connect error', e);
+    res.status(500).json({ error: 'Could not connect to storage.' });
     return;
   }
 
@@ -78,12 +96,9 @@ module.exports = async (req, res) => {
 
     if (op === 'list') {
       const keys = [];
-      let cursor = '0';
-      do {
-        const [nextCursor, batch] = await redis.scan(cursor, { match: key + '*', count: 200 });
-        cursor = nextCursor;
-        keys.push(...batch);
-      } while (cursor !== '0');
+      for await (const k of redis.scanIterator({ MATCH: key + '*', COUNT: 200 })) {
+        keys.push(k);
+      }
       res.status(200).json({ keys });
       return;
     }
