@@ -1141,6 +1141,28 @@ function listAllDrafts(){
   });
 }
 
+// Fixed ids (not host genCode() output) so re-checking "does this already exist" is
+// idempotent across reloads/coaches, instead of reseeding a fresh copy every time.
+var EXAMPLE_INBOX_IDS = {heartMindGut: 'EXAMPLE-HMG', askOrGuess: 'EXAMPLE-AOG'};
+// Makes sure the two example sessions exist as real, persisted drafts so they show up
+// in the coach inbox like any submitted draft — reviewable, notable, markable. Only
+// writes a key the first time it's missing; never overwrites a coach's own edits/notes
+// on a previously-seeded copy.
+function ensureExampleDraftsSeeded(){
+  if(!hasStorage) return Promise.resolve();
+  var keys = Object.keys(EXAMPLE_INBOX_IDS);
+  return Promise.all(keys.map(function(key){
+    var id = EXAMPLE_INBOX_IDS[key];
+    return window.storage.get('draft:'+id, true).then(function(existing){
+      if(existing) return;
+      var d = buildExampleDraft(key);
+      d.id = id;
+      d.status = 'submitted';
+      return window.storage.set('draft:'+id, JSON.stringify(d), true);
+    }).catch(function(){});
+  }));
+}
+
 /* ---------- Moderation (per-username, applies across every draft that username builds) ---------- */
 function normalizeUsername(u){ return (u||'').trim().toLowerCase(); }
 function newModerationRecord(username){
@@ -2372,7 +2394,9 @@ function handleClick(e){
   if(action==='goInbox'){
     state.screen='inbox';
     if(hasStorage){
-      listAllDrafts().then(function(list){ state.inboxList=list; render(); });
+      ensureExampleDraftsSeeded().then(function(){
+        return listAllDrafts();
+      }).then(function(list){ state.inboxList=list; render(); });
       listModerationRecords().then(function(list){ state.flaggedList=list; render(); });
     } else { state.inboxList=[]; state.flaggedList=[]; render(); }
     return;
