@@ -582,24 +582,57 @@
   // api/storage.js. Must run before the main script, since that script checks
   // `typeof window.storage` once at load time.
   window.storage = (function(){
+    // The coach token, not the coach password, is what lives in the browser — and in
+    // sessionStorage rather than localStorage, so closing the tab signs you out. That
+    // matters because the password is shared: a token leak is one tab for a few hours,
+    // whereas a leaked password would have to be re-issued to every coach.
+    var TOKEN_HEADER = 'x-coach-token';
+    var TOKEN_STORE_KEY = 'coachToken';
+    var token = null;
+    try { token = sessionStorage.getItem(TOKEN_STORE_KEY); } catch(e){ token = null; }
+
+    function setToken(t){
+      token = t || null;
+      try {
+        if(token) sessionStorage.setItem(TOKEN_STORE_KEY, token);
+        else sessionStorage.removeItem(TOKEN_STORE_KEY);
+      } catch(e){ /* private mode / storage disabled: token stays in memory only */ }
+    }
+
     function call(body){
+      var headers = {'Content-Type': 'application/json'};
+      if(token) headers[TOKEN_HEADER] = token;
       return fetch('/api/storage', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: JSON.stringify(body)
       }).then(function(res){
         if(!res.ok){
           return res.json().catch(function(){ return {}; }).then(function(err){
-            throw new Error(err.error || ('Storage request failed: '+res.status));
+            var e = new Error(err.error || ('Storage request failed: '+res.status));
+            // Flagged so callers can bounce to the sign-in screen rather than showing
+            // a generic "storage is down" banner for what is really an expired token.
+            if(res.status===401){ setToken(null); e.authRequired = true; }
+            throw e;
           });
         }
         return res.json();
       });
     }
+
     return {
       get: function(key){ return call({op:'get', key:key}); },
       set: function(key, value){ return call({op:'set', key:key, value:value}); },
-      list: function(prefix){ return call({op:'list', key:prefix}); }
+      list: function(prefix){ return call({op:'list', key:prefix}); },
+      listByUser: function(prefix, username){ return call({op:'listByUser', key:prefix, username:username}); },
+      coachLogin: function(password){
+        return call({op:'coachLogin', password:password}).then(function(r){
+          setToken(r && r.token);
+          return r;
+        });
+      },
+      hasCoachToken: function(){ return !!token; },
+      coachSignOut: function(){ setToken(null); }
     };
   })();
 </script>
@@ -707,6 +740,10 @@ var state = {
   flaggedList: [],
   inboxSelectedId: null,
   inboxFlaggedUsername: null,
+  inboxError: '',           // set when storage is unreachable, so the inbox can say so instead of looking empty
+  inboxLoading: false,
+  coachAuthError: '',
+  coachAuthBusy: false,
   homeError: '',
   resumeMatches: [],        // drafts found for the typed username on the "Resume a draft" card
   dragScenarioIdx: null,
@@ -1161,10 +1198,21 @@ function listAllDrafts(){
     return Promise.all(keys.map(function(k){
       return window.storage.get(k, true).then(function(res){
         try{ return patchLegacyDraft(JSON.parse(res.value)); }catch(e){ return null; }
-      }).catch(function(){ return null; });
+      });
     }));
   }).then(function(list){
     return list.filter(Boolean).sort(function(a,b){ return b.updatedAt - a.updatedAt; });
+  });
+}
+
+// Resume-by-username. The server does the matching and returns only this student's
+// drafts — the browser never receives anyone else's. That's what allows the raw
+// `list` op to be coach-only without breaking resume; see api/storage.js.
+function listDraftsForUser(username){
+  if(!hasStorage) return Promise.resolve([]);
+  return window.storage.listByUser('draft:', username).then(function(r){
+    var drafts = (r && r.drafts) || [];
+    return drafts.map(patchLegacyDraft).sort(function(a,b){ return b.updatedAt - a.updatedAt; });
   });
 }
 
@@ -1236,7 +1284,7 @@ function listModerationRecords(){
     return Promise.all(keys.map(function(k){
       return window.storage.get(k, true).then(function(res){
         try{ return patchModeration(JSON.parse(res.value)); }catch(e){ return null; }
-      }).catch(function(){ return null; });
+      });
     }));
   }).then(function(list){
     return list.filter(Boolean).sort(function(a,b){ return (b.lockedAt||0)-(a.lockedAt||0); });
@@ -1272,6 +1320,7 @@ var app = document.getElementById('app');
 function render(){
   var html = '';
   if(state.screen==='home') html = renderHome();
+  else if(state.screen==='coachLogin') html = renderCoachLogin();
   else if(state.screen==='inbox') html = renderShellInbox();
   else if(state.screen==='inboxDraft') html = renderShellInboxDraft();
   else if(state.screen==='inboxFlagged') html = renderShellInboxFlagged();
@@ -1279,7 +1328,7 @@ function render(){
   else html = renderShellDraft();
   app.innerHTML = html;
   attachGlobalHandlers();
-  if(state.screen!=='home' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='playerPreview' && state.draft){
+  if(state.screen!=='home' && state.screen!=='coachLogin' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='playerPreview' && state.draft){
     if(AI_ASSISTANT_ENABLED) renderCoachOverlay();
     renderStickyLayer();
   }
@@ -1327,6 +1376,60 @@ function renderHome(){
     '</div>'+
     '<a class="home-footer-link" data-action="goInbox">I\'m a coach — open the review inbox →</a>'+
   '</div>';
+}
+
+/* ============================= COACH SIGN-IN ============================= */
+function renderCoachLogin(){
+  return ''+
+  '<div class="home-wrap">'+
+    '<div class="home-hero">'+
+      '<div class="glass-pill"><span class="eyebrow">SYNTHESIS · COACH ACCESS</span></div>'+
+      '<h1>Coach sign-in</h1>'+
+      '<p class="visibility-note">🔒 The review inbox is for coaches and the learning team.</p>'+
+    '</div>'+
+    (state.coachAuthError? '<div class="banner">⚠️ '+esc(state.coachAuthError)+'</div>' : '')+
+    '<div class="home-cards single">'+
+      '<div class="home-card">'+
+        '<h3>Enter the coach password</h3>'+
+        '<p>Ask the learning team if you don\'t have it. You\'ll stay signed in until you close this tab.</p>'+
+        '<div class="field"><label>Password</label><input type="password" id="coachPassword" placeholder="Coach password" autocomplete="current-password"></div>'+
+        '<div class="home-card-actions">'+
+          '<button class="btn btn-primary" data-action="coachLogin"'+(state.coachAuthBusy?' disabled':'')+'>'+(state.coachAuthBusy?'Checking…':'Open the inbox →')+'</button>'+
+          '<button class="btn btn-ghost" data-action="goHome">← Back home</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+// Bounce back to sign-in rather than showing a generic storage error, which is what
+// an expired or rejected token would otherwise look like.
+function requireCoachSignIn(msg){
+  window.storage.coachSignOut();
+  state.screen='coachLogin';
+  state.coachAuthError = msg || '';
+  state.coachAuthBusy = false;
+  state.inboxList=[]; state.flaggedList=[]; state.inboxLoading=false;
+  render();
+}
+function loadInbox(){
+  state.inboxError=''; state.inboxLoading=true;
+  ensureExampleDraftsSeeded().then(function(){
+    return listAllDrafts();
+  }).then(function(list){
+    state.inboxList=list; state.inboxLoading=false; render();
+  }).catch(function(e){
+    console.error('inbox load failed', e);
+    state.inboxLoading=false;
+    if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+    state.inboxError='Couldn\'t reach storage, so drafts can\'t be listed right now. Nothing has been lost — reload to try again.';
+    state.inboxList=[]; render();
+  });
+  listModerationRecords().then(function(list){
+    state.flaggedList=list; render();
+  }).catch(function(e){
+    console.error('flagged accounts load failed', e);
+    state.flaggedList=[]; render();
+  });
 }
 
 /* ============================= SHELL (draft screens) ============================= */
@@ -1744,7 +1847,12 @@ function renderShellInbox(){
         '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
       '</div>'+
     '</div>';
-  }).join('') : '<div class="empty-state">No drafts yet. Once a student starts a session, it\'ll show up here.</div>';
+  }).join('') : (state.inboxLoading
+    ? '<div class="empty-state">Loading drafts…</div>'
+    : (state.inboxError
+      ? ''
+      : '<div class="empty-state">No drafts yet. Once a student starts a session, it\'ll show up here.</div>'));
+  var errorBanner = state.inboxError ? '<div class="banner">⚠️ '+esc(state.inboxError)+'</div>' : '';
 
   var activeFlags = (state.flaggedList||[]).filter(function(m){ return m.locked; });
   var flaggedSection = activeFlags.length ? (
@@ -1765,8 +1873,12 @@ function renderShellInbox(){
   '<div class="home-wrap" style="padding-top:44px;">'+
     '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:26px;">'+
       '<div><div class="eyebrow">COACH INBOX</div><h1 style="color:#fff; font-size:28px; margin-top:6px;">Drafts to review</h1></div>'+
-      '<button class="btn btn-ghost-light" data-action="goHome">← Back home</button>'+
+      '<div style="display:flex; align-items:center; gap:10px;">'+
+        '<button class="btn btn-ghost-light" data-action="goHome">← Back home</button>'+
+        '<button class="btn btn-ghost-light" data-action="coachSignOut">Sign out</button>'+
+      '</div>'+
     '</div>'+
+    errorBanner+
     flaggedSection+
     '<h3 style="color:#fff; font-size:16px; margin-bottom:12px;">Drafts</h3>'+
     rows+
@@ -2305,6 +2417,18 @@ function attachGlobalHandlers(){
       debounceSave();
     });
   });
+  // coach password: Enter submits, and the field takes focus on arrival
+  var pwField = document.getElementById('coachPassword');
+  if(pwField){
+    pwField.addEventListener('keydown', function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        var btn = app.querySelector('[data-action="coachLogin"]');
+        if(btn) btn.click();
+      }
+    });
+    if(!state.coachAuthBusy) pwField.focus();
+  }
   // select dropdown
   app.querySelectorAll('select[data-bind]').forEach(function(el){
     el.addEventListener('change', function(){
@@ -2395,11 +2519,13 @@ function handleClick(e){
     var uname = nameEl2 ? nameEl2.value.trim() : '';
     if(!uname){ state.homeError='Type your username.'; state.resumeMatches=[]; render(); return; }
     if(!hasStorage){ state.homeError='Saving isn\'t available in this preview, so drafts can\'t be resumed.'; render(); return; }
-    var wantedName = normalizeUsername(uname);
-    listAllDrafts().then(function(list){
-      var matches = list.filter(function(d){ return normalizeUsername(d.studentName)===wantedName; });
+    listDraftsForUser(uname).then(function(matches){
       if(!matches.length){ state.homeError='No sessions found for that username. Check the spelling, or start a new one.'; state.resumeMatches=[]; render(); return; }
       state.homeError=''; state.resumeMatches=matches; render();
+    }).catch(function(e){
+      console.error('draft lookup failed', e);
+      state.homeError='Couldn\'t reach storage to look up your drafts. Your work is safe — try again in a moment.';
+      state.resumeMatches=[]; render();
     });
     return;
   }
@@ -2420,11 +2546,14 @@ function handleClick(e){
   if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
   if(action==='goInbox'){
     state.screen='inbox';
+    state.inboxError='';
     if(hasStorage){
       ensureExampleDraftsSeeded().then(function(){
         return listAllDrafts();
-      }).then(function(list){ state.inboxList=list; render(); });
-      listModerationRecords().then(function(list){ state.flaggedList=list; render(); });
+      }).then(function(list){ state.inboxList=list; render(); })
+        .catch(function(e){ console.error('inbox load failed', e); state.inboxError='Couldn\'t reach storage, so drafts can\'t be listed right now. Nothing has been lost — reload to try again.'; state.inboxList=[]; render(); });
+      listModerationRecords().then(function(list){ state.flaggedList=list; render(); })
+        .catch(function(e){ console.error('flagged accounts load failed', e); state.flaggedList=[]; render(); });
     } else { state.inboxList=[]; state.flaggedList=[]; render(); }
     return;
   }
@@ -2474,6 +2603,12 @@ function handleClick(e){
         return listAllDrafts();
       }).then(function(list){
         state.inboxList = list;
+        state.screen='inbox';
+        render();
+      }).catch(function(e){
+        console.error('coach action failed', e);
+        if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+        state.inboxError='Couldn\'t save that change — it may not have gone through. Try again in a moment.';
         state.screen='inbox';
         render();
       });
