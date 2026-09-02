@@ -123,6 +123,10 @@
   .resume-match-row:hover{border-color:var(--ink-soft);}
   .resume-match-row h4{font-size:14px; margin:0;}
   .resume-match-row p{font-size:12px; color:var(--ink-soft); font-family:var(--font-mono); margin:2px 0 0;}
+  .example-sessions{max-width:460px; margin:30px auto 0; text-align:center;}
+  .example-sessions h3{color:#fff; font-size:15px; margin-bottom:4px;}
+  .example-sessions p{color:#93A2B3; font-size:13px; margin-bottom:14px;}
+  .example-sessions .resume-matches{margin-top:0; text-align:left;}
 
   /* ---------- Shell (after a draft is loaded) ---------- */
   .shell{display:flex; min-height:100vh;}
@@ -782,6 +786,263 @@ function newDraft(name){
   return d;
 }
 
+/* ---------- Example sessions (browsable from Home, no username/code needed) ----------
+   Content transcribed from Heart_Mind_or_Gut_Discussion_Session.md and
+   Ask_or_Guess_Sample_Session.md — real, fully-written sessions so a new writer can see
+   what a finished draft looks like inside the tool. Opening one hands you your own fresh
+   copy (new id, via buildExampleDraft) rather than editing the shared example. */
+var EXAMPLE_SESSIONS = {
+  heartMindGut: {
+    title: "Heart, Mind, or Gut?",
+    bigIdea: "When making a big decision, where do you turn? Your gut, which reads a situation before you can explain why? Your heart, which knows what you love? Or your mind, which weighs the facts? Every day — with friends, at school, on teams — we lean on all three voices, sometimes without even realizing it. This week, students explore six scenarios that put gut, heart, and mind in competition with each other.",
+    optionCount: 3,
+    scenarios: [
+      {
+        title: "New Kid at Lunch", domain: "Peer / Friendship",
+        setup: "A new student sits alone at lunch every day, headphones on. Your table is usually full, but there's room for one more. What do you do, and why?",
+        options: [
+          {label:"Follow your gut", rationale:"Smile and say hi as you pass — their posture reads as \"not today,\" so you hold off on inviting them.", iconDescription:"a glancing eye"},
+          {label:"Follow your heart", rationale:"Invite them to sit with you now — they seem lonely, and welcoming them would make you happy.", iconDescription:"a figure with open arms"},
+          {label:"Follow your mind", rationale:"Plan it out first — how to make room and introduce them smoothly — then invite them once you're ready.", iconDescription:"a checklist"}
+        ],
+        challenge: [
+          "What's the risk of misreading someone's body language?",
+          "Does waiting for \"the right plan\" risk losing the moment?",
+          "Would your answer change if you were the new student?",
+          "Which voice usually wins for you in social situations?"
+        ],
+        reflection: "Self-check: did you explain WHY you chose gut, heart, or mind — not just which one?"
+      },
+      {
+        title: "Weekend Plans", domain: "Family",
+        setup: "It's your turn to pick your family's weekend plan. Nobody's said it, but you sense everyone's stressed and cooped up. A hike could help everyone unplug. Baking is what you truly love. A museum trip fits the family's schedule and budget best. What do you choose, and why?",
+        options: [
+          {label:"Follow your gut", rationale:"Choose the hike — you sense everyone's stressed and cooped up, even though no one's said so.", iconDescription:"a winding path"},
+          {label:"Follow your heart", rationale:"Choose baking — it's what you love, and it always makes you happy.", iconDescription:"a mixing bowl"},
+          {label:"Follow your mind", rationale:"Choose the museum trip — it fits your family's time and budget best.", iconDescription:"a balanced scale"}
+        ],
+        challenge: [
+          "How do you know if your read on your family's mood is accurate?",
+          "Does \"practical\" always mean \"best\" for a family?",
+          "What's the risk of always picking what makes YOU happy?",
+          "If your whole family disagreed with your pick, would you change your mind?"
+        ],
+        reflection: "Self-check: did you listen closely when a teammate chose differently than you?"
+      },
+      {
+        title: "Science Fair Topic", domain: "School",
+        setup: "You're picking a science fair topic. One idea reminds you of a project that almost worked last year — you sense a twist on it could go further. Another is something you're genuinely passionate about, even if it's more work. A third is the topic most likely to win, based on past years. What do you choose, and why?",
+        options: [
+          {label:"Follow your gut", rationale:"Pick the idea that reminds you of something that almost worked before — you sense this twist could go further.", iconDescription:"a lightbulb with a spark"},
+          {label:"Follow your heart", rationale:"Pick the topic you're passionate about — you'll care about it, even through the extra work.", iconDescription:"a heart with a spark"},
+          {label:"Follow your mind", rationale:"Pick the topic most likely to win, based on what's worked before.", iconDescription:"a trophy"}
+        ],
+        challenge: [
+          "How do you tell the difference between a good hunch and wishful thinking?",
+          "Is passion or strategy a bigger predictor of success?",
+          "What would you do if your heart and your gut disagreed?",
+          "Which voice would your teacher probably recommend?"
+        ],
+        reflection: "Your turn: which voice do you usually listen to first in real life?"
+      },
+      {
+        title: "Team Presentation", domain: "Team / Group",
+        setup: "Your group must decide how to present to the class. You remember how much energy a live demo got last term, and sense this topic could land the same way. A skit is what you'd genuinely enjoy doing. A slideshow best matches the grading rubric. What does your group choose, and why?",
+        options: [
+          {label:"Follow your gut", rationale:"Choose the live demo — a similar format worked well before, and you sense this topic will land the same way.", iconDescription:"a spark"},
+          {label:"Follow your heart", rationale:"Choose the skit — it excites your group most and lets you have fun together.", iconDescription:"theater masks"},
+          {label:"Follow your mind", rationale:"Choose the slideshow — it best matches the rubric and is most likely to earn a strong grade.", iconDescription:"a clipboard with a checkmark"}
+        ],
+        challenge: [
+          "How reliable is a memory of \"what worked before\" for a brand new topic?",
+          "Should a team's grade matter more or less than how much fun they have?",
+          "If your teammates disagreed with your gut, would you push for it anyway?",
+          "Which option requires the most trust in each other?"
+        ],
+        reflection: "Self-check: did your team build on each other's reasoning, or just state opinions?"
+      },
+      {
+        title: "The New Neighbor", domain: "Peer / Friendship",
+        setup: "A new neighbor moved in down the street. They ride their bike down the steepest hill around and always invite you to join something a little daring. Today, they ask you to try the hill with them. What do you do, and why?",
+        options: [
+          {label:"Follow your gut", rationale:"Say \"maybe next time\" — the way they take that hill makes your stomach flip, and something tells you to hang back and watch first.", iconDescription:"a caution mark"},
+          {label:"Follow your heart", rationale:"Go for it right away — trying exciting new things is what you love, and it feels true to who you want to be.", iconDescription:"a bike"},
+          {label:"Follow your mind", rationale:"Join in, but only after working out a plan — a helmet, or starting on a smaller hill — to try it more safely.", iconDescription:"a helmet"}
+        ],
+        challenge: [
+          "Is your gut protecting you here, or just reacting to something new?",
+          "Does trying it \"more safely\" still count as taking the risk?",
+          "What's the biggest downside of each option?",
+          "Would your answer change if a longtime friend asked instead of someone new?"
+        ],
+        reflection: "Your turn: has your gut ever misjudged someone before you got to know them?"
+      },
+      {
+        title: "The Proxima Squad", domain: "Synthesis Platform",
+        setup: "It's Proxima Trophy week, and you're already partied up with one friend. A few planetmates have made some sharp calls in earlier games this week, and something tells you they'd play well together. Your online friends are all up for teaming up, and it'd be fun either way. Or you could join a friend who's excellent at Proxima, giving your team the best shot at winning. Who do you choose, and why?",
+        options: [
+          {label:"Follow your gut", rationale:"Team up with the planetmates — something about the smart calls they made in earlier games tells you they'd be strong teammates, even though you've never played together.", iconDescription:"a planet"},
+          {label:"Follow your heart", rationale:"Team up with your online friends — playing together sounds fun no matter how the game goes.", iconDescription:"a game controller"},
+          {label:"Follow your mind", rationale:"Team up with your skilled friend — it gives your team the best shot at winning the trophy.", iconDescription:"a trophy"}
+        ],
+        challenge: [
+          "Does skill matter more than chemistry on a team?",
+          "What's the risk of teaming with people you've never played with?",
+          "Would your choice change if it weren't Trophy week?",
+          "Is winning the most important goal here, or is something else?"
+        ],
+        reflection: "Self-check: did everyone on your team get a chance to explain their choice?"
+      }
+    ],
+    halftime: {
+      question: "Halftime. Time to check in. So far, which voice have YOU followed most in this session?",
+      options: ["Mostly my gut.", "Mostly my heart.", "Mostly my mind."],
+      reflection: "No wrong answers here. Let's see if that changes in the second half..."
+    },
+    reflection: {
+      question: "Last question. If you could only trust ONE voice for the rest of your life, which would you pick?",
+      options: ["My gut.", "My heart.", "My mind."],
+      reflection: "Tricky, right? Most people need all three — the hard part is knowing which one to trust, and when."
+    }
+  },
+  askOrGuess: {
+    title: "Ask or Guess?",
+    bigIdea: "Some people believe if you want something, you should just ask for it directly. Others believe the people who care about you should notice what you need without being told. Neither approach is right or wrong — each one protects something different. This week, students explore six scenarios that test the line between asking and hoping to be understood.",
+    optionCount: 2,
+    scenarios: [
+      {
+        title: "The Birthday Party", domain: "Peer / Friendship",
+        setup: "Your friend had a birthday party last weekend, and you didn't get an invitation. You're not sure if it was an accident, or on purpose. What do you do?",
+        options: [
+          {label:"Ask directly", rationale:"Ask them why you weren't invited — a real answer clears up the guessing, whatever it turns out to be.", iconDescription:"raised hand"},
+          {label:"Let it be", rationale:"Say nothing and go on as normal — some questions aren't worth the risk of an awkward answer, especially if the friendship still feels fine.", iconDescription:"closed door"}
+        ],
+        challenge: [
+          "Is it possible to feel better without ever knowing the real reason?",
+          "Could asking make things more awkward, even if the answer turns out to be innocent?",
+          "Is staying quiet a form of trust, or a form of avoidance?",
+          "Would your answer change if this kept happening with the same friend?"
+        ],
+        reflection: "If you never brought it up, do you think you'd still be thinking about it a month from now?"
+      },
+      {
+        title: "Stuck on Homework", domain: "Family",
+        setup: "You're stuck on a hard homework problem, and your older sibling is in the next room doing their own thing. What do you do?",
+        options: [
+          {label:"Ask directly", rationale:"Knock and ask for help — it's clear, and it respects their time instead of making them guess what you need.", iconDescription:"open door"},
+          {label:"Try it alone first", rationale:"Attempt the problem yourself before asking anyone — it builds your own skills and saves the ask for when you truly need it.", iconDescription:"pencil and paper"}
+        ],
+        challenge: [
+          "Is there a “right” amount of time to try something alone before asking for help?",
+          "If your sibling says no, does that mean they don't care about you?",
+          "Would your answer change if it was a parent instead of a sibling?",
+          "Could figuring it out alone feel more rewarding than getting the answer quickly?"
+        ],
+        reflection: "Have you ever misjudged whether someone wanted to be asked for help, or left alone?"
+      },
+      {
+        title: "Sabotage or Misunderstanding?", domain: "Team / Group",
+        setup: "Your team agreed on a plan, but one teammate keeps doing something different. It's slowing your team down. What do you do?",
+        options: [
+          {label:"Ask them about it", rationale:"Ask what they're trying to do — maybe they misread the plan, or noticed something the rest of the team missed.", iconDescription:"question mark"},
+          {label:"Trust and wait", rationale:"Say nothing for now and trust they have a reason — jumping to conclusions before the game plays out might cause more damage than their choice ever could.", iconDescription:"hourglass"}
+        ],
+        challenge: [
+          "What's the risk of assuming the worst, if you turn out to be wrong?",
+          "What's the risk of staying quiet, if they really are going off-plan on purpose?",
+          "Could asking about it sound like an accusation, even if you don't mean it that way?",
+          "How much time would you give someone before deciding to say something?"
+        ],
+        reflection: "Have you ever been accused of not following a plan, when really you just saw it differently?"
+      },
+      {
+        title: "The Deadline", domain: "School",
+        setup: "You're overwhelmed this week, and your project is due tomorrow. Your teacher has given extensions before, but has never said outright that they're open to requests. How should you handle it, and why?",
+        options: [
+          {label:"Ask directly", rationale:"Email your teacher and ask for one more day — it's honest, and it gives them full information to make a fair call.", iconDescription:"envelope"},
+          {label:"Push through", rationale:"Stay up late and finish on time — meeting the deadline means your teacher never has to decide whether to bend a rule for you.", iconDescription:"alarm clock"}
+        ],
+        challenge: [
+          "What's the upside of asking, beyond just getting more time?",
+          "What's the upside of not asking, even if it means more work for you?",
+          "Does asking for help ever look like weakness? Should it?",
+          "Would this be different in a strict classroom versus a relaxed one?"
+        ],
+        reflection: "Have you ever been surprised by how someone reacted when you finally asked them for something?"
+      },
+      {
+        title: "The Family Gathering", domain: "Family",
+        setup: "You're tired and don't want to attend a long family gathering this weekend, but your family has never directly said that attendance is required. What do you do?",
+        options: [
+          {label:"Ask directly", rationale:"Ask your parents if you can skip it — it's honest, and gives them the full picture so they can decide fairly.", iconDescription:"raised hand"},
+          {label:"Just go", rationale:"Attend anyway — some things matter enough to family that you'd rather not make anyone decide whether your absence is “allowed.”", iconDescription:"group of people"}
+        ],
+        challenge: [
+          "In your family, would skipping a gathering be seen as rude? Or totally fine?",
+          "Would asking directly feel disrespectful in your family, or completely normal?",
+          "Does guessing put more pressure on the other person to read your mind? Or does it protect them from having to say no out loud?",
+          "Would your answer change if the gathering was for something huge, like a wedding?"
+        ],
+        reflection: "Do you think your family leans more toward Asking, or Guessing? What about your country?"
+      },
+      {
+        title: "Quiet on the Call", domain: "Synthesis Platform",
+        setup: "During your Synthesis session, one of your teammates has their camera off and hasn't said a word in a while. You're not sure if something's wrong, or if they're just listening quietly. What do you do?",
+        options: [
+          {label:"Ask them directly", rationale:"Ask if they're doing okay, or if they want to jump in — it's a small interruption that could make a real difference.", iconDescription:"raised hand"},
+          {label:"Assume they have their own reason", rationale:"Assume they have a reason for staying quiet, and let them rejoin when they're ready — everyone participates differently.", iconDescription:"headphones"}
+        ],
+        challenge: [
+          "Could asking directly make someone feel put on the spot, even if you mean well?",
+          "Could leaving them alone make them feel unnoticed, even if that's not what they want?",
+          "Is there a difference between being “quiet” and “not participating”?",
+          "What would you want a teammate to do if you went quiet?"
+        ],
+        reflection: "Has anyone on your team gone quiet today? What do you think it means?"
+      }
+    ],
+    halftime: {
+      question: "Halftime. Time to check in. So far, has your own default been more Ask, or more Guess?",
+      options: ["I usually ask directly.", "I usually hint or wait."],
+      reflection: "There's no right or wrong style here. But knowing your own default is the first step. In the second half, we raise the stakes."
+    },
+    reflection: {
+      question: "After six rounds of Ask vs. Guess, which do you think leads to fewer misunderstandings overall?",
+      options: ["Asking directly, even if it feels awkward.", "Guessing or hinting, even if it's less certain."],
+      reflection: "Neither style is “better” everywhere. But knowing which one you're using — and which one the other person is expecting — might be the real skill."
+    }
+  }
+};
+function buildExampleDraft(key){
+  var src = EXAMPLE_SESSIONS[key];
+  if(!src) return null;
+  var d = {
+    id: genCode(),
+    studentName: 'Example',
+    createdAt: Date.now(), updatedAt: Date.now(),
+    status: 'draft',
+    title: src.title, bigIdea: src.bigIdea,
+    optionCount: src.optionCount,
+    customDomains: [],
+    scenarios: src.scenarios.map(function(sc){
+      return {
+        id: uid(), title: sc.title, domain: sc.domain, setup: sc.setup,
+        options: sc.options.map(function(o, oi){
+          return {id:uid(), label:o.label, rationale:o.rationale, iconDescription:o.iconDescription, selectedIcon:null, colorIndex:oi};
+        }),
+        challenge: sc.challenge.slice(),
+        reflection: sc.reflection
+      };
+    }),
+    halftime: {question:src.halftime.question, options:src.halftime.options.slice(), reflection:src.halftime.reflection},
+    reflection: {question:src.reflection.question, options:src.reflection.options.slice(), reflection:src.reflection.reflection},
+    aiChat: [],
+    coachNotes: [],
+    coachMessage: ''
+  };
+  return d;
+}
+
 /* ---------- Private sticky notes (never shared with coach) ---------- */
 var NOTE_COLORS = ['yellow','pink','blue','green','purple'];
 var noteZCounter = 40, selectedNoteId = null;
@@ -1005,6 +1266,14 @@ function renderHome(){
           '<button class="btn btn-ghost" data-action="resumeDraft">Find my drafts →</button>'+
         '</div>'+
         resumeMatchesHtml+
+      '</div>'+
+    '</div>'+
+    '<div class="example-sessions">'+
+      '<h3>Or explore an example session</h3>'+
+      '<p>Two fully-written sessions, already loaded — see what a finished draft looks like.</p>'+
+      '<div class="resume-matches">'+
+        '<div class="resume-match-row" data-action="openExampleDraft" data-example="heartMindGut"><h4>Heart, Mind, or Gut?</h4><p>6 scenarios · 3 options each</p></div>'+
+        '<div class="resume-match-row" data-action="openExampleDraft" data-example="askOrGuess"><h4>Ask or Guess?</h4><p>6 scenarios · 2 options each</p></div>'+
       '</div>'+
     '</div>'+
     '<a class="home-footer-link" data-action="goInbox">I\'m a coach — open the review inbox →</a>'+
@@ -2025,9 +2294,11 @@ function sendAppealFromInput(){
 }
 
 // Opens an already-loaded draft: resets save/notes state, enters the shell, then
-// fills in moderation + notes asynchronously. Shared by "start new" and "resume".
-function enterDraft(d){
-  state.draft = d; state.homeError=''; state.screen='setup'; saveStatus='saved'; isDirty=false;
+// fills in moderation + notes asynchronously. Shared by "start new", "resume", and
+// "open an example session" (startScreen lets the example land on the storyboard
+// instead of setup, since there's nothing to fill in there).
+function enterDraft(d, startScreen){
+  state.draft = d; state.homeError=''; state.screen=startScreen||'setup'; saveStatus='saved'; isDirty=false;
   state.notes=[]; notesDirty=false; selectedNoteId=null; state.resumeMatches=[];
   render();
   loadModeration(d.studentName).then(function(m){ state.moderation = m; render(); });
@@ -2088,6 +2359,13 @@ function handleClick(e){
     var chosen = state.resumeMatches.filter(function(d){ return d.id===resumeId; })[0];
     if(!chosen) return;
     enterDraft(chosen);
+    return;
+  }
+  if(action==='openExampleDraft'){
+    var exampleKey = t.getAttribute('data-example');
+    var exampleDraft = buildExampleDraft(exampleKey);
+    if(!exampleDraft) return;
+    enterDraft(exampleDraft, 'storyboard');
     return;
   }
   if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
