@@ -380,7 +380,7 @@
   /* The dock sits mostly off-screen (sliver peeking at the right edge) and slides
      fully into view on hover — see the note pile UX note below. */
   .note-dock{
-    position:fixed; right:6px; top:110px; width:96px; height:96px; z-index:45;
+    position:fixed; right:6px; top:130px; width:96px; height:96px; z-index:45;
     transform:translateY(-50%) translateX(calc(100% - 30px));
     transition:transform .18s ease;
   }
@@ -405,7 +405,7 @@
   }
   .note-dock:hover .note-stack-hint{opacity:1;}
   .note-trash{
-    position:fixed; right:132px; top:110px; transform:translateY(-50%) scale(.8); width:52px; height:52px;
+    position:fixed; right:132px; top:130px; transform:translateY(-50%) scale(.8); width:52px; height:52px;
     border-radius:50%; background:#3a2a1a; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
     font-size:22px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:9999;
   }
@@ -576,6 +576,33 @@
 </head>
 <body>
 <div id="app"></div>
+<script>
+  // Bridges the app's window.storage.get/set/list calls (used throughout the IIFE
+  // below) to /api/storage, a small serverless shim over a Redis database — see
+  // api/storage.js. Must run before the main script, since that script checks
+  // `typeof window.storage` once at load time.
+  window.storage = (function(){
+    function call(body){
+      return fetch('/api/storage', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(body)
+      }).then(function(res){
+        if(!res.ok){
+          return res.json().catch(function(){ return {}; }).then(function(err){
+            throw new Error(err.error || ('Storage request failed: '+res.status));
+          });
+        }
+        return res.json();
+      });
+    }
+    return {
+      get: function(key){ return call({op:'get', key:key}); },
+      set: function(key, value){ return call({op:'set', key:key, value:value}); },
+      list: function(prefix){ return call({op:'list', key:prefix}); }
+    };
+  })();
+</script>
 <script>
 (function(){
 'use strict';
