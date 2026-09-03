@@ -1,0 +1,12 @@
+# Internal project docs and reference material — never meant to be served. This repo
+# has no build step and no dedicated "public" directory, so Vercel's static builder
+# would otherwise serve the whole repo root, including these, at the deploy's own URL.
+# vercel.json's rewrite only redirects "/" to src/authoring-tool.html — it doesn't stop
+# every other path from resolving to whatever file sits there.
+#
+# Nothing in the running app fetches any of these at runtime (the example sessions are
+# transcribed into authoring-tool.html's own JS, not loaded from reference/ over HTTP),
+# so excluding them changes nothing about how the app behaves.
+*.md
+reference/
+docs/

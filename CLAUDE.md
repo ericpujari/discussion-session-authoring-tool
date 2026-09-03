@@ -2,37 +2,42 @@
 
 ## What this project is
 
-This is a web-based **authoring interface** that lets Synthesis session writers (coaches,
-learning team members — not students) draft new Discussion Sessions that automatically
-follow the correct structure and tone rules.
+This is a web-based tool where Synthesis **students** (ages 8–14) draft their own
+Discussion Sessions, which automatically follow the correct structure and tone rules,
+for a **coach** to review before anything goes further.
 
 **This is NOT an AI content generator.** The tool does not write scenarios, options, or
-questions for the user. It is a structured drafting environment — think smart form +
+questions for the student. It is a structured drafting environment — think smart form +
 live structure checker — that:
 
-- Enforces the fixed session structure (see below) so a writer can't accidentally skip a
+- Enforces the fixed session structure (see below) so a student can't accidentally skip a
   section, mistime a scenario, or mix option counts.
 - Surfaces the style/tone/sensitivity guardrails inline while drafting, so the writer
-  self-checks as they go (similar in spirit to the self-check panel pattern this project
-  inherited from the student practice tool it was forked from, but for full session
-  authoring rather than student practice drafts).
+  self-checks as they go.
 - Outputs a clean, correctly formatted session document (matching the structure of the
-  files in `reference/sessions/`) that a writer can export/copy for review.
+  files in `reference/sessions/`) that a coach can review, and that staff can turn into an
+  official published session.
 
-Eric (the user) writes and coaches these sessions himself and knows the voice already —
-this tool exists to make drafting faster and more consistent, not to replace his (or other
-writers') judgment about content.
+A dormant AI writing-assistant (behind `AI_ASSISTANT_ENABLED`, currently `false` — see
+"Architecture conventions" below) exists for the same reason: coaching the student's own
+writing, never generating content in their place.
 
 ## Who uses it
 
-Synthesis session writers — coaches and learning-team members who write Discussion
-Session scripts. Not the end students. (Students get a *different* tool — a separate,
-student-facing practice tool for ages 8–14 to draft their own mini-sessions for coach
-review. It used to live at `reference/session_builder.html` in this repo but was removed
-after student-facing work accidentally landed there instead of in this authoring tool;
-`src/authoring-tool.html` is its fork and carries the same reusable patterns. Don't
-confuse the two — this authoring tool is for the adults writing the real, deployed
-sessions; student-facing changes don't belong here.)
+Two roles, in the one tool:
+
+- **Students** (ages 8–14, worldwide) are the authors. No accounts — a typed username
+  identifies a student's drafts (`listByUser` in `api/storage.js`), autosaved as they
+  work, resumable later by typing that same username again.
+- **Coaches** review what students submit, through a separate password-gated inbox
+  (`COACH_PASSWORD` in `.env.example`) — not the student-facing home screen. A coach can
+  leave notes, send a draft back for revision, or mark it reviewed.
+
+This was forked from an earlier, separate student practice tool that lived at
+`reference/session_builder.html` in this repo (since removed — see "Reference materials"
+below); `src/authoring-tool.html` inherited its reusable patterns (storyboard UI,
+self-check panel, save-reliability system) but is now its own thing, not a stand-in for
+that original tool.
 
 ## Source of truth for structure and rules
 
@@ -82,7 +87,8 @@ culture.
   structure against. When in doubt about what "matches the voice" means, look here.
 - `src/authoring-tool.html` was forked from `reference/session_builder.html` (now removed
   from this repo — see "Who uses it" above) and inherited its reusable patterns: storyboard
-  UI, self-check panel, save-reliability system. Those patterns are the reference now.
+  UI, self-check panel, save-reliability system. Those patterns are the reference now, not
+  the original file itself.
 
 ## Architecture conventions (carried over from session_builder.html's patterns)
 
@@ -110,16 +116,26 @@ culture.
 
 ## Current status
 
-Fresh project, just scaffolded. No UI has been built yet. Next step is to define the exact
-screens/flow for the authoring interface (see open questions below).
+Built and working, not a scaffold. `src/authoring-tool.html` is a single-file app (state
+object + `render()` dispatcher — see "Architecture conventions") backed by three Vercel
+serverless functions in `api/`:
 
-## Open questions to resolve with Eric before/while building
+- `api/storage.js` — a Redis-backed key/value store: draft autosave (with retry and a
+  size cap), resume-by-username, the coach inbox, private per-draft sticky notes, and
+  coach sign-in (a shared password exchanged for a short-lived token).
+- `api/noun-project-search.js` + `api/icon-asset.js` — a signed proxy to the Noun Project
+  icon API, plus a second endpoint that re-fetches a chosen icon by id and embeds it as a
+  permanent `data:` URI (Noun Project's own asset URLs expire roughly an hour after
+  they're issued, which would otherwise rot every icon a student ever picked).
 
-- What's the actual drafting flow? E.g.: one long form matching the template top-to-bottom,
-  or a storyboard-style view (like `src/authoring-tool.html` already has) with
-  per-scenario editing panels?
-- Does this need multi-user/save-and-resume, or is it single-session-at-a-time (draft,
-  export, done)?
-- Export format — Markdown matching the reference sessions' structure? Something else?
-- Does it need a review/handoff step (e.g. flagging for Aaron or another reviewer), or is
-  export the end of this tool's job?
+Drafting flow (answering what used to be open questions): storyboard view with
+per-scenario editing panels, not one long form — Setup → Storyboard (6 scenario cards +
+a fixed halftime card, drag or move-buttons to reorder) → Closing reflection → Review &
+submit. Multi-user save-and-resume, by username, no accounts. Export is Markdown
+matching the reference sessions' structure. The review/handoff step is the coach inbox
+described above — export is not the end of the tool's job, submission is.
+
+Known, accepted gap for the current test deployment: no real student authentication —
+resume-by-username means typing someone else's username reaches their drafts. See the
+README's "Known limitations" section before treating this as production-ready for a
+wider student audience.
