@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Session Builder — Synthesis</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,9 +38,10 @@
       radial-gradient(circle at 1px 1px, rgba(255,255,255,.05) 1px, transparent 0) 0 0/22px 22px,
       linear-gradient(180deg, var(--board), var(--board-2));
     min-height:100vh;
+    min-height:100dvh;
     -webkit-font-smoothing:antialiased;
   }
-  #app{min-height:100vh;}
+  #app{min-height:100vh; min-height:100dvh;}
   h1,h2,h3{font-family:var(--font-display); margin:0; letter-spacing:-0.02em;}
   h1{font-weight:700;}
   h2{font-weight:500;}
@@ -48,6 +49,16 @@
   p{margin:0;}
   button{font-family:inherit; cursor:pointer;}
   input,textarea,select{font-family:inherit; font-size:15px; color:var(--ink);}
+  /* iOS Safari zooms the whole page when a focused control is under 16px, and never
+     zooms back out. Coarse-pointer only, so the desktop type scale is unaffected.
+     Must come after every other font-size rule for inputs to win without !important. */
+  @media (pointer:coarse){
+    input,textarea,select,
+    .lane input[type=text], .lane textarea,
+    .icon-desc-box input[type=text],
+    .sticky-note textarea,
+    .coach-foot textarea{font-size:16px;}
+  }
   a{color:inherit;}
   ::selection{background:var(--lane-b-soft);}
   :focus-visible{outline:3px solid #F2C572; outline-offset:2px; border-radius:6px;}
@@ -132,11 +143,11 @@
   .example-sessions .resume-matches{margin-top:0; text-align:left;}
 
   /* ---------- Shell (after a draft is loaded) ---------- */
-  .shell{display:flex; min-height:100vh;}
+  .shell{display:flex; min-height:100vh; min-height:100dvh;}
   .rail{
     width:220px; flex-shrink:0; background:rgba(0,0,0,.18); padding:22px 14px; display:flex; flex-direction:column;
     border-right:1px solid rgba(255,255,255,.08);
-    position:sticky; top:0; height:100vh; overflow-y:auto;
+    position:sticky; top:0; height:100vh; height:100dvh; overflow-y:auto;
   }
   .rail-code{font-family:var(--font-mono); font-size:11px; color:#9FB0C0; letter-spacing:.06em; margin-bottom:2px;}
   .rail-name{color:#fff; font-weight:600; font-size:14.5px; margin-bottom:18px;}
@@ -349,13 +360,14 @@
 
   /* ---------- Coach drawer ---------- */
   .coach-tab{
-    position:fixed; right:0; top:calc(50% + 68px); transform:translateY(-50%) rotate(0deg); z-index:40;
+    position:fixed; right:max(0px, env(safe-area-inset-right)); top:calc(50% + 68px);
+    transform:translateY(-50%) rotate(0deg); z-index:40;
     background:var(--ink); color:#F2EEE1; padding:14px 12px; border-radius:12px 0 0 12px; box-shadow:var(--shadow);
     display:flex; flex-direction:column; align-items:center; gap:6px; font-size:12px; font-weight:700; cursor:pointer;
     border:none;
   }
   .coach-drawer{
-    position:fixed; top:0; right:0; height:100vh; width:380px; max-width:92vw; background:#fff; box-shadow:-8px 0 30px rgba(0,0,0,.35);
+    position:fixed; top:0; right:0; height:100vh; height:100dvh; width:380px; max-width:92vw; background:#fff; box-shadow:-8px 0 30px rgba(0,0,0,.35);
     z-index:50; display:flex; flex-direction:column; transform:translateX(100%); transition:transform .18s cubic-bezier(.4,0,1,1);
   }
   .coach-drawer.open{transform:translateX(0); transition:transform .42s cubic-bezier(.34,1.56,.64,1);}
@@ -384,7 +396,7 @@
   /* The dock sits mostly off-screen (sliver peeking at the right edge) and slides
      fully into view on hover — see the note pile UX note below. */
   .note-dock{
-    position:fixed; right:6px; top:130px; width:96px; height:96px; z-index:45;
+    position:fixed; right:max(6px, env(safe-area-inset-right)); top:130px; width:96px; height:96px; z-index:45;
     transform:translateY(-50%) translateX(calc(100% - 30px));
     transition:transform .18s ease;
   }
@@ -409,11 +421,16 @@
   }
   .note-dock:hover .note-stack-hint{opacity:1;}
   .note-trash{
-    position:fixed; right:132px; top:130px; transform:translateY(-50%) scale(.8); width:52px; height:52px;
+    position:fixed; right:calc(132px + env(safe-area-inset-right, 0px)); top:130px;
+    transform:translateY(-50%) scale(.8); width:52px; height:52px;
     border-radius:50%; background:#3a2a1a; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
     font-size:22px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:9999;
   }
   .note-trash.visible{opacity:1; pointer-events:auto; transform:translateY(-50%) scale(1);}
+  @media (max-width:480px){
+    /* Keep in sync with syncStickySize() — the drag/clamp maths reads those constants. */
+    .sticky-note{width:140px; min-height:140px;}
+  }
   .sticky-note{
     position:fixed; width:170px; min-height:170px; border-radius:4px; background:#F5E6A8;
     box-shadow:0 6px 16px rgba(0,0,0,.3); padding:26px 8px 8px; display:flex; flex-direction:column; gap:6px;
@@ -489,7 +506,8 @@
   .pp-screen{
     position:fixed; inset:0; z-index:500;
     display:flex; flex-direction:column; align-items:center;
-    padding:28px 20px 34px;
+    padding:max(28px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right))
+            calc(34px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left));
     background:
       radial-gradient(1.5px 1.5px at 10% 20%, rgba(255,255,255,.9) 50%, transparent 51%),
       radial-gradient(1.5px 1.5px at 80% 15%, rgba(255,255,255,.7) 50%, transparent 51%),
@@ -517,7 +535,7 @@
   .pp-stage{width:100%; max-width:980px; flex:1; display:flex;}
   .pp-card{
     background:#F8F8F6; border-radius:20px; box-shadow:0 20px 50px rgba(0,0,0,.35);
-    width:100%; min-height:min(560px, 62vh); padding:44px 48px 34px;
+    width:100%; min-height:min(560px, 62vh); min-height:min(560px, 62dvh); padding:44px 48px 34px;
     display:flex; flex-direction:column; align-items:center; justify-content:flex-start; text-align:center; gap:18px;
   }
   .pp-h2{font-family:var(--font-display); font-weight:700; font-size:28px; color:#1D3A6E; margin:0;}
@@ -780,6 +798,13 @@ function esc(s){
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
 var STICKY_W = 170, STICKY_H = 170, HANDLE_H = 22;
+// Mirrors the .sticky-note @media rule above. Every drag/clamp calculation reads these,
+// so if the CSS size changes and these don't, notes clamp to the wrong bounds.
+function syncStickySize(){
+  var small = window.innerWidth <= 480;
+  STICKY_W = STICKY_H = small ? 140 : 170;
+}
+syncStickySize();
 function genCode(){
   var alpha = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   var s = '';
@@ -2921,6 +2946,10 @@ window.addEventListener('pagehide', flushSave);
 // note back into view rather than leaving it stranded off-screen with no way
 // to reach it.
 window.addEventListener('resize', function(){
+  // Before the early return: the size constants must track the breakpoint even when
+  // no notes are on screen, or the next render clamps against stale bounds. On iOS
+  // this also fires when the URL bar collapses, which is what kept notes jumping.
+  syncStickySize();
   if(!document.getElementById('notesOverlayRoot')) return;
   var changed = false;
   state.notes.forEach(function(n){
