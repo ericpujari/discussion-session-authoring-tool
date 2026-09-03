@@ -425,7 +425,7 @@
   .note-stack-sheet:nth-child(2){transform:rotate(4deg) translate(3px,-2px);}
   .note-stack-top{
     transform:rotate(-2deg); cursor:grab; display:flex; align-items:center; justify-content:center;
-    font-size:26px; color:rgba(0,0,0,.35); user-select:none;
+    font-size:26px; color:rgba(0,0,0,.35); user-select:none; touch-action:none;
   }
   .note-stack-top:active{cursor:grabbing;}
   .note-stack-hint{
@@ -437,7 +437,7 @@
   /* Without hover the dock would sit 70% off-screen forever and the whole notes
      feature would be invisible on a tablet. Show it outright on coarse pointers. */
   @media (pointer:coarse){
-    .note-dock{transform:translateY(-50%) translateX(0);}
+    .note-dock{transform:translateY(-50%) translateX(0); width:72px; height:72px;}
     .note-stack-hint{opacity:1;}
   }
   .note-trash{
@@ -447,21 +447,27 @@
     font-size:22px; opacity:0; pointer-events:none; transition:opacity .15s, transform .15s; z-index:9999;
   }
   .note-trash.visible{opacity:1; pointer-events:auto; transform:translateY(-50%) scale(1);}
+  @media (pointer:coarse){
+    /* Matches the shrunk .note-dock above: keeps roughly the same visual gap between
+       dock and trash while the whole cluster hugs the edge more tightly. */
+    .note-trash{right:calc(96px + env(safe-area-inset-right, 0px));}
+  }
   @media (max-width:480px){
     /* Keep in sync with syncStickySize() — the drag/clamp maths reads those constants. */
     .sticky-note{width:140px; min-height:140px;}
   }
   .sticky-note{
     position:fixed; width:170px; min-height:170px; border-radius:4px; background:#F5E6A8;
-    box-shadow:0 6px 16px rgba(0,0,0,.3); padding:26px 8px 8px; display:flex; flex-direction:column; gap:6px;
+    box-shadow:0 6px 16px rgba(0,0,0,.3); padding:34px 8px 8px; display:flex; flex-direction:column; gap:6px;
   }
   .sticky-note.note-pink{background:#F5C6D6;} .sticky-note.note-blue{background:#C6DCF5;}
   .sticky-note.note-green{background:#C9E8CE;} .sticky-note.note-purple{background:#DAC6F0;}
   .sticky-note.selected{outline:2px solid #fff; outline-offset:-2px;}
   .sticky-note.over-trash{opacity:.45;}
   .sticky-drag-handle{
-    position:absolute; top:0; left:0; right:0; height:22px; background:rgba(0,0,0,.08); border-radius:4px 4px 0 0;
+    position:absolute; top:0; left:0; right:0; height:30px; background:rgba(0,0,0,.08); border-radius:4px 4px 0 0;
     cursor:grab; display:flex; justify-content:space-between; align-items:center; padding:0 6px; color:rgba(0,0,0,.35);
+    touch-action:none; -webkit-user-select:none; user-select:none;
   }
   .sticky-drag-handle:active{cursor:grabbing;}
   .note-colors{
@@ -836,7 +842,7 @@ function esc(s){
 }
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
-var STICKY_W = 170, STICKY_H = 170, HANDLE_H = 22;
+var STICKY_W = 170, STICKY_H = 170, HANDLE_H = 30; // keep in sync with .sticky-drag-handle's height
 // Mirrors the .sticky-note @media rule above. Every drag/clamp calculation reads these,
 // so if the CSS size changes and these don't, notes clamp to the wrong bounds.
 function syncStickySize(){
@@ -2318,7 +2324,13 @@ function isOverTrash(noteEl){
   var t = document.getElementById('noteTrash');
   if(!t || !noteEl) return false;
   var a = noteEl.getBoundingClientRect(), b = t.getBoundingClientRect();
-  return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  // A full-box overlap test against a note several times the trash icon's size meant
+  // its edge merely passing near the icon was enough to delete it. Require the note's
+  // own center to actually land on (or just past the edge of) the icon instead — a
+  // modest touch-friendly pad, not "anywhere the note happens to reach."
+  var pad = 16;
+  var cx = a.left + a.width/2, cy = a.top + a.height/2;
+  return cx > b.left-pad && cx < b.right+pad && cy > b.top-pad && cy < b.bottom+pad;
 }
 // Ensures a just-moved note never fully covers another note's grab-bar band,
 // so every note in a pile stays individually grabbable by its visible top edge —
