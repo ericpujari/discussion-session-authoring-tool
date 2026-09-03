@@ -899,7 +899,6 @@ function newDraft(name){
     status: 'draft',
     title:'', bigIdea:'',
     optionCount: 3,
-    customDomains: [],
     scenarios: [],
     halftime:{question:'', options:['',''], reflection:''},
     reflection:{question:'', options:['',''], reflection:''},
@@ -1153,7 +1152,6 @@ function buildExampleDraft(key){
     status: 'draft',
     title: src.title, bigIdea: src.bigIdea,
     optionCount: src.optionCount,
-    customDomains: [],
     scenarios: src.scenarios.map(function(sc){
       return {
         id: uid(), title: sc.title, domain: sc.domain, setup: sc.setup,
@@ -1581,12 +1579,17 @@ function loadInbox(){
     state.inboxError='Couldn\'t reach storage, so drafts can\'t be listed right now. Nothing has been lost — reload to try again.';
     state.inboxList=[]; render();
   });
-  listModerationRecords().then(function(list){
-    state.flaggedList=list; render();
-  }).catch(function(e){
-    console.error('flagged accounts load failed', e);
-    state.flaggedList=[]; render();
-  });
+  // Same reasoning as enterDraft, but this one costs a full Redis SCAN of moduser:*
+  // every time a coach opens the inbox — for a flagged-accounts list that is always
+  // empty while the assistant is off.
+  if(AI_ASSISTANT_ENABLED){
+    listModerationRecords().then(function(list){
+      state.flaggedList=list; render();
+    }).catch(function(e){
+      console.error('flagged accounts load failed', e);
+      state.flaggedList=[]; render();
+    });
+  }
 }
 
 /* ============================= SHELL (draft screens) ============================= */
@@ -2662,7 +2665,12 @@ function enterDraft(d, startScreen){
   state.draft = d; state.homeError=''; state.screen=startScreen||'setup'; saveStatus='saved'; isDirty=false;
   state.notes=[]; notesDirty=false; selectedNoteId=null; state.resumeMatches=[];
   render();
-  loadModeration(d.studentName).then(function(m){ state.moderation = m; render(); });
+  // The moderation record exists only to drive the AI assistant's lockout flow. While
+  // the assistant is off nothing can write one and nothing reads it, so fetching it is
+  // a wasted round-trip on every draft open (and one more thing that can fail).
+  if(AI_ASSISTANT_ENABLED){
+    loadModeration(d.studentName).then(function(m){ state.moderation = m; render(); });
+  }
   loadNotes(d.id).then(function(n){
     var needsSave = false;
     n.forEach(function(note, idx){
@@ -2699,7 +2707,9 @@ function handleClick(e){
     state.screen='setup';
     saveDraft();
     render();
-    loadModeration(name).then(function(m){ state.moderation = m; render(); });
+    if(AI_ASSISTANT_ENABLED){
+      loadModeration(name).then(function(m){ state.moderation = m; render(); });
+    }
     return;
   }
   if(action==='resumeDraft'){
@@ -3007,11 +3017,6 @@ function handleClick(e){
   }
   if(action==='exportMarkdown'){
     downloadText((state.draft.title||'session').toLowerCase().replace(/[^a-z0-9]+/g,'_')+'.md', toMarkdown(state.draft));
-    return;
-  }
-  if(action==='askCoachScenario'){
-    var sc = state.draft.scenarios[state.scenarioIndex];
-    askCoach('Can you check the balance and tone of this scenario?', {scenario:sc, optionCount:state.draft.optionCount});
     return;
   }
   if(action==='askCoachWhole'){
