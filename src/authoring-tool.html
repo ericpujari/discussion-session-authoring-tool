@@ -748,6 +748,11 @@ var AI_ASSISTANT_ENABLED = false;
    illustrates it later). Available on every option from the start — no completion gate. */
 var ICON_SEARCH_ENABLED = true;
 var ICON_SEARCH_ENDPOINT = '/api/noun-project-search';
+// Selecting a search result doesn't use its (temporary — see api/icon-asset.js's
+// header comment) thumbnailUrl/iconUrl directly. It re-fetches the icon by id
+// through this endpoint, which downloads and embeds it as a data: URI that never
+// expires, before it's saved into the draft.
+var ICON_EMBED_ENDPOINT = '/api/icon-asset';
 
 var COACH_SYSTEM_PROMPT = [
 "You are a warm, encouraging writing assistant helping a student, age 8 to 14, design their own Discussion Session for Synthesis — a program where kids around the world discuss dilemmas that have two or three options, none of which is correct. A separate human coach also reviews their work later, so you are their first stop, not their only one.",
@@ -800,6 +805,8 @@ var state = {
   iconSearchResults: [],
   iconSearchLoading: false,
   iconSearchError: '',
+  iconEmbedPending: null,   // {scenarioIndex, optionIndex} while a clicked result is being embedded
+  iconEmbedError: '',
   submitError: ''    // set when "Submit to my coach" is blocked by an incomplete section
 };
 
@@ -2398,20 +2405,67 @@ function performIconSearch(query){
       render();
     });
 }
+// Fetches the chosen icon's bytes (embedded as a data: URI by api/icon-asset.js)
+// and only then writes selectedIcon — never the raw search result, which still
+// carries Noun Project's own, soon-to-expire thumbnailUrl/iconUrl.
+function embedSelectedIcon(icon, scenarioIndex, optionIndex){
+  state.iconEmbedPending = {scenarioIndex:scenarioIndex, optionIndex:optionIndex};
+  state.iconEmbedError = '';
+  render();
+  fetch(ICON_EMBED_ENDPOINT+'?id='+encodeURIComponent(icon.id))
+    .then(function(res){
+      if(!res.ok) return res.json().catch(function(){ return {}; }).then(function(err){
+        throw new Error(err.error || 'embed-failed');
+      });
+      return res.json();
+    })
+    .then(function(data){
+      state.iconEmbedPending = null;
+      // The scenario/option this was for may no longer exist — e.g. the option
+      // count shrank while this request was in flight.
+      var sc = state.draft && state.draft.scenarios[scenarioIndex];
+      var opt = sc && sc.options[optionIndex];
+      if(opt){
+        opt.selectedIcon = {
+          id: icon.id,
+          thumbnailUrl: data.dataUri,
+          iconUrl: data.dataUri,
+          attributionName: data.attributionName || icon.attributionName || null,
+          attributionUrl: data.attributionUrl || icon.attributionUrl || null
+        };
+        state.iconSearchOpen = null;
+        debounceSave();
+      }
+      render();
+    })
+    .catch(function(e){
+      state.iconEmbedPending = null;
+      state.iconEmbedError = (e && e.message && e.message!=='embed-failed')
+        ? e.message
+        : "Couldn't save that icon — try again in a moment.";
+      render();
+    });
+}
 function iconSearchStripHtml(o, scenarioIdx, optionIdx){
   var loc = state.iconSearchOpen;
   if(!loc || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
+  var pending = state.iconEmbedPending;
+  var isEmbedding = !!(pending && pending.scenarioIndex===scenarioIdx && pending.optionIndex===optionIdx);
   var resultsHtml = state.iconSearchResults.map(function(icon, idx){
     var selected = o.selectedIcon && o.selectedIcon.id===icon.id;
     return '<button type="button" class="icon-search-result'+(selected?' selected':'')+'" data-action="selectIcon" data-idx="'+idx+'" title="'+esc(icon.attributionName||'Noun Project icon')+'"><img src="'+esc(icon.thumbnailUrl)+'" alt=""></button>';
   }).join('');
-  var body = state.iconSearchLoading
-    ? '<div class="icon-search-status">Searching…</div>'
-    : state.iconSearchError
-      ? '<div class="icon-search-status icon-search-error">'+esc(state.iconSearchError)+'</div>'
-      : (state.iconSearchResults.length
-          ? '<div class="icon-search-results">'+resultsHtml+'</div>'
-          : '<div class="icon-search-status">No icons found. Try a simpler word.</div>');
+  var body = isEmbedding
+    ? '<div class="icon-search-status">Saving icon…</div>'
+    : state.iconEmbedError
+      ? '<div class="icon-search-status icon-search-error">'+esc(state.iconEmbedError)+'</div>'
+      : (state.iconSearchLoading
+        ? '<div class="icon-search-status">Searching…</div>'
+        : state.iconSearchError
+          ? '<div class="icon-search-status icon-search-error">'+esc(state.iconSearchError)+'</div>'
+          : (state.iconSearchResults.length
+              ? '<div class="icon-search-results">'+resultsHtml+'</div>'
+              : '<div class="icon-search-status">No icons found. Try a simpler word.</div>'));
   return '<div class="icon-search-strip"><button type="button" class="icon-search-dismiss" data-action="dismissIconSearch" title="Close">✕</button>'+body+'</div>';
 }
 
@@ -2952,19 +3006,17 @@ function handleClick(e){
     var query = state.draft.scenarios[scenarioIdx].options[optionIdx].iconDescription.trim();
     if(!query) return;
     state.iconSearchOpen = {scenarioIndex:scenarioIdx, optionIndex:optionIdx};
+    state.iconEmbedError = '';
     performIconSearch(query);
     return;
   }
-  if(action==='dismissIconSearch'){ state.iconSearchOpen = null; render(); return; }
+  if(action==='dismissIconSearch'){ state.iconSearchOpen = null; state.iconEmbedError=''; render(); return; }
   if(action==='selectIcon'){
     var iconIdx = parseInt(t.getAttribute('data-idx'),10);
     var icon = state.iconSearchResults[iconIdx];
     if(!icon || !state.iconSearchOpen) return;
     var loc = state.iconSearchOpen;
-    state.draft.scenarios[loc.scenarioIndex].options[loc.optionIndex].selectedIcon = icon;
-    debounceSave();
-    state.iconSearchOpen = null;
-    render();
+    embedSelectedIcon(icon, loc.scenarioIndex, loc.optionIndex);
     return;
   }
   if(action==='clearIcon'){
