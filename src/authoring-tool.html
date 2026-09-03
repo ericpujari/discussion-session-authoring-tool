@@ -799,7 +799,8 @@ var state = {
   iconSearchOpen: null,      // {scenarioIndex, optionIndex} while an option's inline search strip is showing
   iconSearchResults: [],
   iconSearchLoading: false,
-  iconSearchError: ''
+  iconSearchError: '',
+  submitError: ''    // set when "Submit to my coach" is blocked by an incomplete section
 };
 
 var REDIRECT_MESSAGE_1 = "This assistant is here to help you build your own Discussion Session for Synthesis — things like scenario setups, options, and questions other students will discuss. Let's focus on that. What part of your session would you like help with?";
@@ -1338,8 +1339,14 @@ function patchLegacyDraft(d){
 function loadDraft(code){
   if(!hasStorage) return Promise.resolve(null);
   return window.storage.get('draft:'+code.trim().toUpperCase(), true)
-    .then(function(r){ return r ? patchLegacyDraft(JSON.parse(r.value)) : null; })
-    .catch(function(){ return null; });
+    .then(function(r){
+      if(!r) return null; // key genuinely doesn't exist
+      try { return patchLegacyDraft(JSON.parse(r.value)); }
+      catch(e){ return null; } // corrupt stored value — treat like not-found, not a fetch failure
+    });
+    // No catch here: a network/auth failure should reach the caller as a rejection
+    // (this function has exactly one caller) instead of looking identical to "no
+    // such draft," which is what let an expired coach session fail silently.
 }
 function listAllDrafts(){
   if(!hasStorage) return Promise.resolve([]);
@@ -1608,6 +1615,22 @@ function stepDone(key){
   if(key==='storyboard') return d.scenarios.every(scenarioComplete) && !!(d.halftime.question.trim());
   if(key==='reflection') return !!(d.reflection.question.trim());
   return false;
+}
+// Reuses the same completeness checks the rail's "done" dots already use, so submit
+// and the rail can never disagree about what "finished" means. Named per-scenario
+// (not just "storyboard incomplete") so a writer isn't left guessing which of six
+// scenarios still needs work.
+function firstIncompleteSubmitReason(d){
+  if(!stepDone('setup')) return 'Add a title and the big idea on the Setup page before submitting.';
+  for(var i=0;i<d.scenarios.length;i++){
+    if(!scenarioComplete(d.scenarios[i])){
+      var titleBit = d.scenarios[i].title.trim() ? ' ("'+d.scenarios[i].title.trim()+'")' : '';
+      return 'Scenario '+(i+1)+titleBit+' still needs a title, setup, and a reason for every option before submitting.';
+    }
+  }
+  if(!d.halftime.question.trim()) return 'Write the halftime question before submitting.';
+  if(!d.reflection.question.trim()) return 'Write the closing reflection question before submitting.';
+  return null;
 }
 function railHtml(){
   var d = state.draft;
@@ -1983,6 +2006,7 @@ function renderReview(){
   return ''+
   '<div class="page-head"><div class="eyebrow">STEP 4</div><h2>Review &amp; send to your coach</h2><p>Here\'s the full session, put together. This is shared with your coach so they can leave notes.</p></div>'+
   '<div style="margin-bottom:14px;"><span class="status-badge '+statusCls+'">'+statusLabel+'</span></div>'+
+  (state.submitError? '<div class="banner">\u26A0\uFE0F '+esc(state.submitError)+'</div>' : '')+
   renderReviewPreview(d)+
   notes+
   balanceStripHtml()+
@@ -2662,7 +2686,7 @@ function sendAppealFromInput(){
 // "open an example session" (startScreen lets the example land on the storyboard
 // instead of setup, since there's nothing to fill in there).
 function enterDraft(d, startScreen){
-  state.draft = d; state.homeError=''; state.screen=startScreen||'setup'; saveStatus='saved'; isDirty=false;
+  state.draft = d; state.homeError=''; state.submitError=''; state.screen=startScreen||'setup'; saveStatus='saved'; isDirty=false;
   state.notes=[]; notesDirty=false; selectedNoteId=null; state.resumeMatches=[];
   render();
   // The moderation record exists only to drive the AI assistant's lockout flow. While
@@ -2786,7 +2810,7 @@ function handleClick(e){
     enterDraft(exampleDraft, 'storyboard');
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
   if(action==='goInbox'){
     if(!window.storage.hasCoachToken()){
       state.screen='coachLogin'; state.coachAuthError=''; state.coachAuthBusy=false; render(); return;
@@ -2850,6 +2874,12 @@ function handleClick(e){
       state.flaggedList = list;
       state.screen = 'inbox';
       render();
+    }).catch(function(e){
+      console.error('unlock failed', e);
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = 'Couldn\'t unlock that account — try again in a moment.';
+      state.screen = 'inbox';
+      render();
     });
     return;
   }
@@ -2858,23 +2888,28 @@ function handleClick(e){
     var fbEl = document.getElementById('coachFeedbackText');
     var text = fbEl ? fbEl.value.trim() : '';
     loadDraft(id).then(function(d){
-      if(!d) return;
+      if(!d){
+        state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
+        state.screen='inbox';
+        render();
+        return;
+      }
       if(text) d.coachNotes.push({text:text, at:Date.now()});
       d.status = action==='markReviewed' ? 'reviewed' : 'draft';
       d.updatedAt = Date.now();
-      window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+      return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
         return listAllDrafts();
       }).then(function(list){
         state.inboxList = list;
         state.screen='inbox';
         render();
-      }).catch(function(e){
-        console.error('coach action failed', e);
-        if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
-        state.inboxError='Couldn\'t save that change — it may not have gone through. Try again in a moment.';
-        state.screen='inbox';
-        render();
       });
+    }).catch(function(e){
+      console.error('coach action failed', e);
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError='Couldn\'t save that change — it may not have gone through. Try again in a moment.';
+      state.screen='inbox';
+      render();
     });
     return;
   }
@@ -2888,7 +2923,13 @@ function handleClick(e){
 
   if(!state.draft) return; // remaining actions require a loaded draft
 
-  if(action==='nav'){ state.screen = t.getAttribute('data-target'); render(); return; }
+  if(action==='nav'){
+    var navTarget = t.getAttribute('data-target');
+    if(navTarget==='review') state.submitError=''; // don't show a stale reason after they've gone and fixed it
+    state.screen = navTarget;
+    render();
+    return;
+  }
   if(action==='openScenario'){ state.scenarioIndex = parseInt(t.getAttribute('data-idx'),10); state.screen='scenario'; render(); return; }
   if(action==='openHalftime'){ state.screen='halftimeEditor'; render(); return; }
   if(action==='prevScenario'){ if(state.scenarioIndex>0){ state.scenarioIndex--; render(); } return; }
@@ -3010,6 +3051,9 @@ function handleClick(e){
   if(action==='removereflectionOpt'){ var ri=parseInt(t.getAttribute('data-oidx'),10); state.draft.reflection.options.splice(ri,1); debounceSave(); render(); return; }
 
   if(action==='submitToCoach'){
+    var blockReason = firstIncompleteSubmitReason(state.draft);
+    if(blockReason){ state.submitError = blockReason; render(); return; }
+    state.submitError = '';
     state.draft.status='submitted';
     saveDraft();
     render();
