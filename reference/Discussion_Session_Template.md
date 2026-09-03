@@ -38,7 +38,7 @@
 
 > **Rules for this block:**
 > - Exactly 6 scenarios. Timing is fixed and does not flex: **2-6, 6-10, 10-14, [HALFTIME 14-15], 15-19, 19-23, 23-27.**
-> - Every scenario in a session uses the **same number of options** — either 2 or 3, never mixed within one session.
+> - Every scenario in a session uses the **same number of options** — 2, 3, or 4, never mixed within one session.
 > - Vary the *domain* across the six: aim for a spread across peer/friendship, family, school, and team/group contexts. One scenario (often Scenario 6, but not required) can tie directly to the Synthesis platform (Polis, Proxima, Speedrun, supercollaborators).
 > - A pop-culture/fiction anchor (naming a book, film, or show) is optional per session — some sessions use it throughout, some never do. Pick one mode and stay consistent within a session.
 

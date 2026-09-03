@@ -41,7 +41,7 @@ building or modifying any structural logic. Key fixed rules from it:
 
 - Exactly **6 scenarios**, fixed timing: 2-6, 6-10, 10-14, **[HALFTIME 14-15]**, 15-19,
   19-23, 23-27.
-- Every scenario in a session uses the **same option count** throughout — either 2 or 3,
+- Every scenario in a session uses the **same option count** throughout — 2, 3, or 4,
   never mixed within one session.
 - Domains should rotate across peer/friendship, family, school, team/group — with an
   optional Synthesis-platform-specific scenario (usually Scenario 6).
