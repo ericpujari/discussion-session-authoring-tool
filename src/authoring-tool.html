@@ -2545,16 +2545,36 @@ function handleClick(e){
   }
   if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
   if(action==='goInbox'){
+    if(!window.storage.hasCoachToken()){
+      state.screen='coachLogin'; state.coachAuthError=''; state.coachAuthBusy=false; render(); return;
+    }
     state.screen='inbox';
-    state.inboxError='';
-    if(hasStorage){
-      ensureExampleDraftsSeeded().then(function(){
-        return listAllDrafts();
-      }).then(function(list){ state.inboxList=list; render(); })
-        .catch(function(e){ console.error('inbox load failed', e); state.inboxError='Couldn\'t reach storage, so drafts can\'t be listed right now. Nothing has been lost — reload to try again.'; state.inboxList=[]; render(); });
-      listModerationRecords().then(function(list){ state.flaggedList=list; render(); })
-        .catch(function(e){ console.error('flagged accounts load failed', e); state.flaggedList=[]; render(); });
-    } else { state.inboxList=[]; state.flaggedList=[]; render(); }
+    render();
+    loadInbox();
+    return;
+  }
+  if(action==='coachLogin'){
+    var pwEl = document.getElementById('coachPassword');
+    var pw = pwEl ? pwEl.value : '';
+    if(!pw){ state.coachAuthError='Enter the coach password.'; render(); return; }
+    state.coachAuthBusy=true; state.coachAuthError=''; render();
+    window.storage.coachLogin(pw).then(function(){
+      state.coachAuthBusy=false; state.coachAuthError='';
+      state.screen='inbox'; render();
+      loadInbox();
+    }).catch(function(e){
+      console.error('coach sign-in failed', e);
+      state.coachAuthBusy=false;
+      state.coachAuthError=(e && e.message) || 'Sign-in failed. Try again.';
+      render();
+    });
+    return;
+  }
+  if(action==='coachSignOut'){
+    window.storage.coachSignOut();
+    state.screen='home';
+    state.inboxList=[]; state.flaggedList=[]; state.inboxError=''; state.coachAuthError='';
+    render();
     return;
   }
   if(action==='openInboxDraft'){
