@@ -133,6 +133,7 @@
   .rail{
     width:220px; flex-shrink:0; background:rgba(0,0,0,.18); padding:22px 14px; display:flex; flex-direction:column;
     border-right:1px solid rgba(255,255,255,.08);
+    position:sticky; top:0; height:100vh; overflow-y:auto;
   }
   .rail-code{font-family:var(--font-mono); font-size:11px; color:#9FB0C0; letter-spacing:.06em; margin-bottom:2px;}
   .rail-name{color:#fff; font-weight:600; font-size:14.5px; margin-bottom:18px;}
@@ -160,7 +161,7 @@
   .main{flex:1; min-width:0; padding:34px 40px 120px; max-width:1140px; margin:0 auto;}
   @media (max-width:860px){
     .shell{flex-direction:column;}
-    .rail{width:100%; flex-direction:row; align-items:center; overflow-x:auto; padding:12px 16px; gap:14px;}
+    .rail{width:100%; flex-direction:row; align-items:center; overflow-x:auto; overflow-y:visible; padding:12px 16px; gap:14px; height:auto; top:0;}
     .rail-scenarios{display:none;}
     .rail-name, .rail-code{display:none;}
     .rail-spacer{display:none;}
@@ -171,7 +172,7 @@
 
   .page-head{margin-bottom:26px;}
   .page-head h2{color:#fff; font-size:clamp(24px,3vw,30px); margin:6px 0 8px;}
-  .page-head p{color:#C7D2DD; font-size:14.5px; max-width:560px; line-height:1.5;}
+  .page-head p{color:#C7D2DD; font-size:14.5px; line-height:1.5;}
 
   .panel{background:var(--paper); border-radius:var(--radius); padding:26px 28px; box-shadow:var(--shadow); margin-bottom:20px; container-type:inline-size;}
   .panel h3{font-size:17px; margin-bottom:14px;}
@@ -1599,7 +1600,7 @@ function renderScenario(){
           (oi<sc.options.length-1? '<button data-action="moveLane" data-idx="'+oi+'" data-dir="1" title="Move right">▶</button>' : '')+
         '</div>'+
       '</div>'+
-      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an icon, e.g. shield">'+iconSearchBtnHtml(i, oi)+'</div>'+
+      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an image">'+iconSearchBtnHtml(i, oi)+'</div>'+
       iconSearchStripHtml(o, i, oi)+
       '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Label (optional)">'+
       '<textarea data-bind="option.rationale" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
@@ -2429,6 +2430,16 @@ function attachGlobalHandlers(){
     });
     if(!state.coachAuthBusy) pwField.focus();
   }
+  // icon search: Enter runs the search, same as clicking the Search button
+  app.querySelectorAll('input[data-bind="option.iconDescription"]').forEach(function(el){
+    el.addEventListener('keydown', function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        var btn = el.parentElement.querySelector('[data-action="searchIcon"]');
+        if(btn) btn.click();
+      }
+    });
+  });
   // select dropdown
   app.querySelectorAll('select[data-bind]').forEach(function(el){
     el.addEventListener('change', function(){
@@ -2780,6 +2791,10 @@ function handleClick(e){
 
 /* ---------- Drag and drop ---------- */
 function handleDragStart(e){
+  // Don't let the card's draggable="true" hijack normal text selection/typing
+  // inside its own inputs, textareas, or buttons — only the surrounding card
+  // area should act as the grab handle.
+  if(e.target.closest('input, textarea, select, button')){ e.preventDefault(); return; }
   var t = e.target.closest('[data-drag]');
   if(!t) return;
   var kind = t.getAttribute('data-drag');
