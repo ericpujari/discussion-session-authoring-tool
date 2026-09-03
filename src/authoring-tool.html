@@ -171,6 +171,7 @@
   .rail-save-indicator.saving{color:#9FB0C0;}
   .rail-save-indicator.saved{color:#6FAE9F;}
   .rail-save-indicator.failed{color:#E08A7D; font-weight:600;}
+  .rail-save-indicator.failedfinal, .rail-save-indicator.toobig{color:#F0776A; font-weight:700;}
 
   .main{flex:1; min-width:0; padding:34px 40px 120px; max-width:1140px; margin:0 auto;}
   @media (max-width:860px){
@@ -643,11 +644,13 @@
     function call(body){
       var headers = {'Content-Type': 'application/json'};
       if(token) headers[TOKEN_HEADER] = token;
-      return fetch('/api/storage', {
-        method: 'POST',
-        headers: headers,
-        body: JSON.stringify(body)
-      }).then(function(res){
+      var payload = JSON.stringify(body);
+      var opts = {method: 'POST', headers: headers, body: payload};
+      // keepalive is what lets a save fired during pagehide survive the unload, but the
+      // spec caps keepalive bodies at 64KB and browsers reject anything larger outright
+      // — so only opt in when comfortably under, and let big saves take their chances.
+      if(payload.length < 60000) opts.keepalive = true;
+      return fetch('/api/storage', opts).then(function(res){
         if(!res.ok){
           return res.json().catch(function(){ return {}; }).then(function(err){
             var e = new Error(err.error || ('Storage request failed: '+res.status));
@@ -807,6 +810,15 @@ var LOCK_MESSAGE_SEVERE = "🔒 This message has been flagged, and your assistan
 
 var hasStorage = (typeof window.storage !== 'undefined' && window.storage !== null);
 var saveTimer = null;
+// Backoff schedule for retrying a save the server rejected. Without a retry, a failed
+// save is simply never tried again — debounceSave only ever runs from an input handler,
+// so a user who stops typing after one network blip loses everything since the last
+// successful write. Budget resets on every fresh edit (see debounceSave).
+var SAVE_RETRY_DELAYS = [2000, 5000, 15000];
+var saveRetryTimer = null, saveRetryAttempt = 0;
+// Upstash rejects oversized values outright; refuse locally rather than retry-looping
+// against a write that can never land.
+var MAX_DRAFT_BYTES = 256 * 1024;
 
 /* ============================= UTIL ============================= */
 function esc(s){
@@ -835,11 +847,16 @@ var isDirty = false;
 function debounceSave(){
   isDirty = true;
   setSaveIndicator('unsaved');
+  // Fresh edit: cancel any pending retry (it would carry a stale snapshot) and hand
+  // the new save a full retry budget.
+  if(saveRetryTimer){ clearTimeout(saveRetryTimer); saveRetryTimer = null; }
+  saveRetryAttempt = 0;
   if(saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(saveDraft, 600);
 }
 function flushSave(){
   if(saveTimer){ clearTimeout(saveTimer); saveTimer = null; }
+  if(saveRetryTimer){ clearTimeout(saveRetryTimer); saveRetryTimer = null; }
   if(state.draft && isDirty) saveDraft();
   if(notesSaveTimer){ clearTimeout(notesSaveTimer); notesSaveTimer = null; }
   if(state.draft && notesDirty) saveNotes();
@@ -1192,9 +1209,14 @@ function currentAttachForScreen(){
 }
 
 /* ============================= STORAGE ============================= */
-var saveStatus = 'saved'; // 'saved' | 'unsaved' | 'saving' | 'failed'
+var saveStatus = 'saved'; // 'saved' | 'unsaved' | 'saving' | 'failed' | 'failedfinal' | 'toobig'
 function saveStatusText(status){
-  return status==='saved' ? 'Saved ✓' : status==='saving' ? 'Saving…' : status==='failed' ? '⚠ Save failed' : 'Unsaved changes…';
+  return status==='saved' ? 'Saved ✓'
+    : status==='saving' ? 'Saving…'
+    : status==='failed' ? '⚠ Save failed — retrying…'
+    : status==='failedfinal' ? '⚠ Can’t save — copy your work'
+    : status==='toobig' ? '⚠ Too long to save — shorten it'
+    : 'Unsaved changes…';
 }
 function setSaveIndicator(status){
   saveStatus = status;
@@ -1205,33 +1227,114 @@ function setSaveIndicator(status){
 }
 function saveDraft(){
   if(!hasStorage || !state.draft) return;
+  // Any armed retry is stale the moment we send newer content.
+  if(saveRetryTimer){ clearTimeout(saveRetryTimer); saveRetryTimer = null; }
+  var draftId = state.draft.id;
+  var payload = JSON.stringify(state.draft);
+  if(payload.length > MAX_DRAFT_BYTES){
+    isDirty = true;
+    setSaveIndicator('toobig');
+    return;
+  }
   isDirty = false;
   state.draft.updatedAt = Date.now();
   setSaveIndicator('saving');
-  window.storage.set('draft:'+state.draft.id, JSON.stringify(state.draft), true).then(function(){
-    setSaveIndicator('saved');
+  window.storage.set('draft:'+draftId, payload, true).then(function(){
+    saveRetryAttempt = 0;
+    // isDirty flips back to true if the user typed while this was in flight — saying
+    // "Saved" then would be a lie about content the server hasn't seen.
+    setSaveIndicator(isDirty ? 'unsaved' : 'saved');
   }).catch(function(e){
     console.error('save failed', e);
     isDirty = true;
-    setSaveIndicator('failed');
+    scheduleSaveRetry(draftId);
   });
 }
+function scheduleSaveRetry(draftId){
+  if(saveRetryAttempt >= SAVE_RETRY_DELAYS.length){
+    setSaveIndicator('failedfinal');
+    return;
+  }
+  setSaveIndicator('failed');
+  var delay = SAVE_RETRY_DELAYS[saveRetryAttempt++];
+  saveRetryTimer = setTimeout(function(){
+    saveRetryTimer = null;
+    // The draft may have been closed or swapped out while we waited.
+    if(state.draft && state.draft.id === draftId && isDirty) saveDraft();
+  }, delay);
+}
+// Every load path funnels through here (loadDraft, listAllDrafts, listDraftsForUser),
+// so this is the one place that can guarantee the shape the render code assumes.
+// It has to be total: renderers call .trim() on title/setup/label/rationale and index
+// scenarios[0..5] directly, so a single field of the wrong type white-screens the app,
+// and the storage API accepts arbitrary writes from anyone. Returns null for anything
+// too broken to repair; callers filter those out.
+var SCENARIO_COUNT = 6;
+function patchOption(o, oi){
+  if(!o || typeof o !== 'object') o = {};
+  if(typeof o.id !== 'string' || !o.id) o.id = uid();
+  if(typeof o.label !== 'string') o.label = '';
+  if(typeof o.rationale !== 'string') o.rationale = '';
+  if(typeof o.iconDescription !== 'string'){
+    o.iconDescription = o.icon ? (LEGACY_ICON_LABELS[o.icon] || '') : '';
+  }
+  if(!o.selectedIcon || typeof o.selectedIcon !== 'object') o.selectedIcon = null;
+  // Out-of-range would make LANES[colorIndex] undefined and throw on .color.
+  if(typeof o.colorIndex !== 'number' || o.colorIndex < 0 || o.colorIndex >= LANES.length){
+    o.colorIndex = oi % LANES.length;
+  }
+  return o;
+}
+function patchScenario(sc, optionCount){
+  if(!sc || typeof sc !== 'object') sc = {};
+  if(typeof sc.id !== 'string' || !sc.id) sc.id = uid();
+  if(typeof sc.title !== 'string') sc.title = '';
+  if(typeof sc.domain !== 'string') sc.domain = '';
+  if(typeof sc.setup !== 'string') sc.setup = '';
+  if(typeof sc.reflection !== 'string') sc.reflection = '';
+  if(!Array.isArray(sc.challenge)) sc.challenge = [];
+  sc.challenge = sc.challenge.map(function(q){ return typeof q === 'string' ? q : ''; });
+  while(sc.challenge.length < 2) sc.challenge.push('');
+  if(!Array.isArray(sc.options)) sc.options = [];
+  sc.options = sc.options.map(patchOption);
+  while(sc.options.length < optionCount) sc.options.push(newOption(sc.options.length));
+  return sc;
+}
+// Shared by halftime and the closing reflection — same {question, options[], reflection} shape.
+function patchCheckinBlock(b){
+  if(!b || typeof b !== 'object') b = {};
+  if(typeof b.question !== 'string') b.question = '';
+  if(typeof b.reflection !== 'string') b.reflection = '';
+  if(!Array.isArray(b.options)) b.options = [];
+  b.options = b.options.map(function(o){ return typeof o === 'string' ? o : ''; });
+  while(b.options.length < 2) b.options.push('');
+  return b;
+}
 function patchLegacyDraft(d){
-  if(!d) return d;
-  if(typeof d.bigIdea !== 'string') d.bigIdea = d.blurb || '';
-  if(!Array.isArray(d.customDomains)) d.customDomains = [];
+  if(!d || typeof d !== 'object' || Array.isArray(d)) return null;
+  if(typeof d.id !== 'string' || !d.id) return null; // no key, nothing we can save back to
+  if(typeof d.studentName !== 'string' || !d.studentName) d.studentName = 'Student';
+  if(typeof d.status !== 'string') d.status = 'draft';
+  if(typeof d.createdAt !== 'number') d.createdAt = Date.now();
+  if(typeof d.updatedAt !== 'number') d.updatedAt = d.createdAt;
+  if(typeof d.title !== 'string') d.title = '';
+  if(typeof d.bigIdea !== 'string') d.bigIdea = typeof d.blurb === 'string' ? d.blurb : '';
+  if(typeof d.optionCount !== 'number' || d.optionCount < 2 || d.optionCount > LANES.length){
+    d.optionCount = 3;
+  }
   if(!Array.isArray(d.coachNotes)) d.coachNotes = [];
+  d.coachNotes = d.coachNotes.filter(function(n){ return n && typeof n.text === 'string'; });
   if(!Array.isArray(d.aiChat)) d.aiChat = [];
   if(typeof d.coachMessage !== 'string') d.coachMessage = '';
-  (d.scenarios||[]).forEach(function(sc){
-    (sc.options||[]).forEach(function(o, oi){
-      if(typeof o.iconDescription !== 'string'){
-        o.iconDescription = o.icon ? (LEGACY_ICON_LABELS[o.icon] || '') : '';
-      }
-      if(typeof o.selectedIcon === 'undefined') o.selectedIcon = null;
-      if(typeof o.colorIndex !== 'number') o.colorIndex = oi;
-    });
+  d.halftime = patchCheckinBlock(d.halftime);
+  d.reflection = patchCheckinBlock(d.reflection);
+  // Exactly six, always: PP_SEQUENCE and the Markdown timing ranges are both hardcoded
+  // to six, so a shorter list throws and a longer one exports rows with no time range.
+  if(!Array.isArray(d.scenarios)) d.scenarios = [];
+  d.scenarios = d.scenarios.slice(0, SCENARIO_COUNT).map(function(sc){
+    return patchScenario(sc, d.optionCount);
   });
+  while(d.scenarios.length < SCENARIO_COUNT) d.scenarios.push(patchScenario(null, d.optionCount));
   return d;
 }
 function loadDraft(code){
@@ -1261,7 +1364,7 @@ function listDraftsForUser(username){
   if(!hasStorage) return Promise.resolve([]);
   return window.storage.listByUser('draft:', username).then(function(r){
     var drafts = (r && r.drafts) || [];
-    return drafts.map(patchLegacyDraft).sort(function(a,b){ return b.updatedAt - a.updatedAt; });
+    return drafts.map(patchLegacyDraft).filter(Boolean).sort(function(a,b){ return b.updatedAt - a.updatedAt; });
   });
 }
 
@@ -1412,7 +1515,7 @@ function renderHome(){
       '<div class="home-card">'+
         '<h3>Get started</h3>'+
         '<p>Type your username, then start a brand new session or pick up one you\'ve already begun.</p>'+
-        '<div class="field"><label>Username</label><input type="text" id="username" placeholder="e.g. alex1234"></div>'+
+        '<div class="field"><label>Username</label><input type="text" id="username" maxlength="40" placeholder="e.g. alex1234"></div>'+
         '<div class="home-card-actions">'+
           '<button class="btn btn-primary" data-action="startNew">Start a new session →</button>'+
           '<button class="btn btn-ghost" data-action="resumeDraft">Find my drafts →</button>'+
@@ -1549,8 +1652,8 @@ function renderSetup(){
   return ''+
   '<div class="page-head"><div class="eyebrow">STEP 1</div><h2>Set up your session</h2><p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
   '<div class="panel">'+
-    '<div class="field"><label>Title</label><input type="text" data-bind="title" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">A short phrase, often a question. 1-4 words.</div></div>'+
-    '<div class="field"><label>Overall idea for this session</label><textarea data-bind="bigIdea" placeholder="What real-life tension does this session explore? Why does it matter to you?" style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">More detail helps — context, examples, why it matters. Every session ends with the same spirit: "'+MANTRA+'"</div></div>'+
+    '<div class="field"><label>Title</label><input type="text" data-bind="title" maxlength="80" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">A short phrase, often a question. 1-4 words.</div></div>'+
+    '<div class="field"><label>Overall idea for this session</label><textarea data-bind="bigIdea" maxlength="2000" placeholder="What real-life tension does this session explore? Why does it matter to you?" style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">More detail helps — context, examples, why it matters. Every session ends with the same spirit: "'+MANTRA+'"</div></div>'+
   '</div>'+
   (d.coachNotes.length? renderCoachNotesPreview() : '')+
   '<button class="btn btn-primary" data-action="nav" data-target="storyboard">Next: build your storyboard →</button>';
@@ -1659,16 +1762,16 @@ function renderScenario(){
           (oi<sc.options.length-1? '<button data-action="moveLane" data-idx="'+oi+'" data-dir="1" title="Move right">▶</button>' : '')+
         '</div>'+
       '</div>'+
-      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an image">'+iconSearchBtnHtml(i, oi)+'</div>'+
+      '<div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi)+'</span><input type="text" data-bind="option.iconDescription" maxlength="80" data-oidx="'+oi+'" value="'+esc(o.iconDescription)+'" placeholder="Search for an image">'+iconSearchBtnHtml(i, oi)+'</div>'+
       iconSearchStripHtml(o, i, oi)+
-      '<input type="text" data-bind="option.label" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Label (optional)">'+
-      '<textarea data-bind="option.rationale" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
+      '<input type="text" data-bind="option.label" maxlength="60" data-oidx="'+oi+'" value="'+esc(o.label)+'" placeholder="Label (optional)">'+
+      '<textarea data-bind="option.rationale" maxlength="400" data-oidx="'+oi+'" placeholder="Its own genuine, confident reason...">'+esc(o.rationale)+'</textarea>'+
       '<div class="wc">'+wordCount(o.rationale)+' words</div>'+
     '</div>';
   }).join('');
 
   var chQ = sc.challenge.map(function(q,qi){
-    return '<div class="qrow"><input type="text" data-bind="challenge" data-qidx="'+qi+'" value="'+esc(q)+'" placeholder="Challenge question '+(qi+1)+'">'+
+    return '<div class="qrow"><input type="text" data-bind="challenge" maxlength="300" data-qidx="'+qi+'" value="'+esc(q)+'" placeholder="Challenge question '+(qi+1)+'">'+
       (sc.challenge.length>2? '<button class="btn-icon" data-action="removeChallenge" data-qidx="'+qi+'">✕</button>' : '')+
     '</div>';
   }).join('');
@@ -1677,10 +1780,10 @@ function renderScenario(){
   '<div class="page-head"><div class="eyebrow">SCENARIO '+(i+1)+' OF 6</div><h2>'+esc(sc.title||'Untitled scenario')+'</h2><p>Real sessions run about 4 minutes per scenario. Setup is 1-3 sentences, second person, ending in a question.</p></div>'+
   '<div class="panel">'+
     '<div class="row">'+
-      '<div class="field"><label>Scenario title</label><input type="text" data-bind="scTitle" value="'+esc(sc.title)+'" placeholder="e.g. The Group Project"></div>'+
+      '<div class="field"><label>Scenario title</label><input type="text" data-bind="scTitle" maxlength="80" value="'+esc(sc.title)+'" placeholder="e.g. The Group Project"></div>'+
       '<div class="field"><label>Domain</label><select data-bind="scDomain"><option value="">Choose one…</option>'+domainOpts+'</select></div>'+
     '</div>'+
-    '<div class="field"><label>Setup</label><textarea data-bind="scSetup" placeholder="You are... What do you do? Why?" style="min-height:170px;">'+esc(sc.setup)+'</textarea></div>'+
+    '<div class="field"><label>Setup</label><textarea data-bind="scSetup" maxlength="600" placeholder="You are... What do you do? Why?" style="min-height:170px;">'+esc(sc.setup)+'</textarea></div>'+
   '</div>'+
   '<div class="panel">'+
     '<h3>Options — drag to reorder, they should feel equally good</h3>'+
@@ -1691,7 +1794,7 @@ function renderScenario(){
     '<h3>Challenge questions</h3>'+
     '<div class="qlist">'+chQ+'</div>'+
     (sc.challenge.length<4? '<button class="add-row-btn" data-action="addChallenge">+ Add another challenge question</button>' : '')+
-    '<div class="field" style="margin-top:16px;"><label>Reflection question</label><textarea data-bind="scReflection" placeholder="Turn it toward your own life or your team today...">'+esc(sc.reflection)+'</textarea></div>'+
+    '<div class="field" style="margin-top:16px;"><label>Reflection question</label><textarea data-bind="scReflection" maxlength="300" placeholder="Turn it toward your own life or your team today...">'+esc(sc.reflection)+'</textarea></div>'+
   '</div>'+
   '<div class="scenario-nav">'+
     '<button class="btn btn-ghost-light" data-action="prevScenario" '+(i===0?'disabled':'')+'>← Scenario '+i+'</button>'+
@@ -1706,10 +1809,10 @@ function renderHalftimeEditor(){
   return ''+
   '<div class="page-head"><div class="eyebrow">HALFTIME · AFTER SCENARIO 3</div><h2>Halftime check-in</h2><p>A short pulse-check, not a 7th scenario. This card always stays put on the storyboard.</p></div>'+
   '<div class="panel">'+
-    '<div class="field"><label>Halftime question</label><textarea data-bind="halftimeQ" placeholder="e.g. How much are you contributing so far?">'+esc(h.question)+'</textarea></div>'+
+    '<div class="field"><label>Halftime question</label><textarea data-bind="halftimeQ" maxlength="300" placeholder="e.g. How much are you contributing so far?">'+esc(h.question)+'</textarea></div>'+
     '<label style="display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Options</label>'+
     renderOptionsEditor(h,'halftime')+
-    '<div class="field" style="margin-top:14px;"><label>Forward-looking reflection line</label><textarea data-bind="halftimeRefl" placeholder="One short line setting up the second half">'+esc(h.reflection)+'</textarea></div>'+
+    '<div class="field" style="margin-top:14px;"><label>Forward-looking reflection line</label><textarea data-bind="halftimeRefl" maxlength="300" placeholder="One short line setting up the second half">'+esc(h.reflection)+'</textarea></div>'+
   '</div>'+
   '<div style="display:flex; gap:10px; justify-content:space-between;">'+
     '<button class="btn btn-ghost-light" data-action="nav" data-target="storyboard">← Back to storyboard</button>'+
@@ -1721,7 +1824,7 @@ function renderHalftimeEditor(){
 /* ---------- Reflection (shared options-editor layout) ---------- */
 function renderOptionsEditor(obj, kind){
   var rows = obj.options.map(function(o,oi){
-    return '<div class="qrow"><input type="text" data-bind="'+kind+'Opt" data-oidx="'+oi+'" value="'+esc(o)+'" placeholder="Option '+(oi+1)+'">'+
+    return '<div class="qrow"><input type="text" data-bind="'+kind+'Opt" maxlength="200" data-oidx="'+oi+'" value="'+esc(o)+'" placeholder="Option '+(oi+1)+'">'+
       (obj.options.length>2? '<button class="btn-icon" data-action="remove'+kind+'Opt" data-oidx="'+oi+'">✕</button>' : '')+
     '</div>';
   }).join('');
@@ -1733,10 +1836,10 @@ function renderReflection(){
   return ''+
   '<div class="page-head"><div class="eyebrow">STEP 3</div><h2>Closing reflection</h2><p>What do you want people to consider as the session ends?</p></div>'+
   '<div class="panel">'+
-    '<div class="field"><label>Closing question</label><textarea data-bind="reflectionQ" placeholder="e.g. Which skill matters more overall?">'+esc(r.question)+'</textarea></div>'+
+    '<div class="field"><label>Closing question</label><textarea data-bind="reflectionQ" maxlength="300" placeholder="e.g. Which skill matters more overall?">'+esc(r.question)+'</textarea></div>'+
     '<label style="display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">Options</label>'+
     renderOptionsEditor(r,'reflection')+
-    '<div class="field" style="margin-top:14px;"><label>Closing line</label><textarea data-bind="reflectionRefl" placeholder="A line that reinforces there\'s no universal winner">'+esc(r.reflection)+'</textarea></div>'+
+    '<div class="field" style="margin-top:14px;"><label>Closing line</label><textarea data-bind="reflectionRefl" maxlength="300" placeholder="A line that reinforces there\'s no universal winner">'+esc(r.reflection)+'</textarea></div>'+
   '</div>'+
   '<div style="display:flex; gap:10px; justify-content:space-between;">'+
     '<button class="btn btn-ghost-light" data-action="nav" data-target="storyboard">← Back to storyboard</button>'+
@@ -1882,7 +1985,7 @@ function renderReview(){
   balanceStripHtml()+
   '<div class="panel">'+
     '<h3>Message to your coach</h3>'+
-    '<div class="field"><textarea data-bind="coachMessage" placeholder="What would you like coach input on?">'+esc(d.coachMessage)+'</textarea></div>'+
+    '<div class="field"><textarea data-bind="coachMessage" maxlength="1000" placeholder="What would you like coach input on?">'+esc(d.coachMessage)+'</textarea></div>'+
   '</div>'+
   '<div class="panel">'+
     '<h3>Ready?</h3>'+
@@ -1967,7 +2070,7 @@ function renderShellInboxFlagged(){
     (incidents ? '<div class="panel"><h3>Incident history</h3><div class="coach-notes">'+incidents+'</div></div>' : '')+
     '<div class="panel">'+
       '<h3>Unlock this account</h3>'+
-      '<div class="field"><textarea id="unlockNoteText" placeholder="Optional note for your records"></textarea></div>'+
+      '<div class="field"><textarea id="unlockNoteText" maxlength="1000" placeholder="Optional note for your records"></textarea></div>'+
       '<button class="btn btn-primary" data-action="unlockUser" data-username="'+esc(mod.username)+'">Unlock — let them continue</button>'+
     '</div>'+
   '</div>';
@@ -1989,7 +2092,7 @@ function renderShellInboxDraft(){
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
     '<div class="panel">'+
       '<h3>Leave feedback for '+esc(d.studentName)+'</h3>'+
-      '<div class="field"><textarea id="coachFeedbackText" placeholder="What\'s working? What needs another pass?"></textarea></div>'+
+      '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass?"></textarea></div>'+
       '<div class="review-actions">'+
         '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back for revisions</button>'+
         '<button class="btn btn-primary" data-action="markReviewed" data-id="'+esc(d.id)+'">Mark reviewed ✅</button>'+
@@ -2079,7 +2182,7 @@ function renderStickyNote(n){
     '<div class="note-colors">'+NOTE_COLORS.map(function(c){
       return '<button class="note-color-dot note-color-'+c+(c===n.color?' selected':'')+'" data-action="setNoteColor" data-noteid="'+n.id+'" data-color="'+c+'" title="'+c+'"></button>';
     }).join('')+'</div>'+
-    '<textarea data-bind="noteText" data-noteid="'+n.id+'" placeholder="Write a thought...">'+esc(n.text)+'</textarea>'+
+    '<textarea data-bind="noteText" maxlength="1000" data-noteid="'+n.id+'" placeholder="Write a thought...">'+esc(n.text)+'</textarea>'+
   '</div>';
 }
 function renderStickyLayer(){
@@ -2828,9 +2931,34 @@ function handleClick(e){
 
   if(action==='setOptionCount'){
     var n = parseInt(t.getAttribute('data-n'),10);
-    var anyContent = state.draft.scenarios.some(function(sc){ return sc.title.trim()||sc.setup.trim()||sc.options.some(function(o){return o.label.trim()||o.rationale.trim();}); });
-    if(anyContent && n!==state.draft.optionCount){
-      if(!confirm('Changing option count will reset all 6 scenarios\' options. Continue?')) return;
+    var curCount = state.draft.optionCount;
+    if(n === curCount) return;
+    // Growing keeps every existing option, so it needs no warning at all. Shrinking
+    // drops the options past the new count permanently — so only prompt when those
+    // specific slots actually hold something, and say exactly what is lost.
+    if(n < curCount){
+      var affected = 0, doomedSlots = [];
+      state.draft.scenarios.forEach(function(sc){
+        var hit = false;
+        for(var oi=n; oi<sc.options.length; oi++){
+          var o = sc.options[oi];
+          if(!o) continue;
+          if(o.label.trim() || o.rationale.trim() || o.iconDescription.trim() || o.selectedIcon){
+            hit = true;
+            if(doomedSlots.indexOf(oi+1) === -1) doomedSlots.push(oi+1);
+          }
+        }
+        if(hit) affected++;
+      });
+      if(affected){
+        doomedSlots.sort(function(a,b){ return a-b; });
+        var slotLabel = doomedSlots.length===1
+          ? ('Option ' + doomedSlots[0])
+          : ('Options ' + doomedSlots.slice(0,-1).join(', ') + ' and ' + doomedSlots[doomedSlots.length-1]);
+        if(!confirm(slotLabel + ' will be deleted from ' + affected + ' scenario' +
+                    (affected===1?'':'s') + ', and this can\'t be undone.\n\nSwitch to ' +
+                    n + ' options anyway?')) return;
+      }
     }
     state.draft.optionCount = n;
     state.draft.scenarios.forEach(function(sc){
