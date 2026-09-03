@@ -233,6 +233,19 @@
   }
   .index-card .empty{color:#A69A78; font-size:13px; font-style:italic;}
 
+  .index-card .card-head{display:flex; align-items:flex-start; justify-content:space-between; gap:8px;}
+  .index-card .move-btns{display:flex; gap:4px; flex-shrink:0;}
+  .index-card .move-btns button{
+    width:26px; height:26px; border-radius:6px; border:1px solid var(--line); background:#fff;
+    font-size:11px; line-height:1; padding:0; color:var(--ink-soft);
+  }
+  .index-card .move-btns button:hover{background:var(--paper-2); color:var(--ink);}
+  /* HTML5 drag-and-drop never fires on touch, so these buttons are the only way to
+     reorder there — size them for a fingertip rather than a cursor. */
+  @media (pointer:coarse){
+    .index-card .move-btns button, .lane .move-btns button{width:36px; height:36px; font-size:14px;}
+  }
+
   .index-card.halftime-card{border:1.5px dashed var(--pin); cursor:pointer;}
   .index-card.halftime-card .num{background:var(--pin);}
   .index-card.halftime-card .halftime-pin{
@@ -400,7 +413,7 @@
     transform:translateY(-50%) translateX(calc(100% - 30px));
     transition:transform .18s ease;
   }
-  .note-dock:hover{transform:translateY(-50%) translateX(0);}
+  .note-dock:hover, .note-dock:focus-within{transform:translateY(-50%) translateX(0);}
   .note-stack{
     position:absolute; inset:0;
   }
@@ -419,7 +432,13 @@
     font-size:11px; color:#C7D2DD; pointer-events:none;
     opacity:0; transition:opacity .15s;
   }
-  .note-dock:hover .note-stack-hint{opacity:1;}
+  .note-dock:hover .note-stack-hint, .note-dock:focus-within .note-stack-hint{opacity:1;}
+  /* Without hover the dock would sit 70% off-screen forever and the whole notes
+     feature would be invisible on a tablet. Show it outright on coarse pointers. */
+  @media (pointer:coarse){
+    .note-dock{transform:translateY(-50%) translateX(0);}
+    .note-stack-hint{opacity:1;}
+  }
   .note-trash{
     position:fixed; right:calc(132px + env(safe-area-inset-right, 0px)); top:130px;
     transform:translateY(-50%) scale(.8); width:52px; height:52px;
@@ -1562,7 +1581,13 @@ function renderStoryboard(){
     return ''+
     '<div class="index-card" style="--r:'+rot+'deg" draggable="true" data-action="openScenario" data-idx="'+i+'" data-drag="scenario" data-dragidx="'+i+'">'+
       '<div class="pin"></div>'+
-      '<div class="num">SCENARIO '+(i+1)+' OF 6</div>'+
+      '<div class="card-head">'+
+        '<div class="num">SCENARIO '+(i+1)+' OF 6</div>'+
+        '<div class="move-btns">'+
+          (i>0? '<button type="button" data-action="moveScenario" data-idx="'+i+'" data-dir="-1" title="Move earlier" aria-label="Move scenario '+(i+1)+' earlier">\u25C0</button>' : '')+
+          (i<d.scenarios.length-1? '<button type="button" data-action="moveScenario" data-idx="'+i+'" data-dir="1" title="Move later" aria-label="Move scenario '+(i+1)+' later">\u25B6</button>' : '')+
+        '</div>'+
+      '</div>'+
       '<h4>'+(sc.title? esc(sc.title) : '<span class="empty">Untitled — click to write</span>')+'</h4>'+
       (sc.setup? '<div style="font-size:12px; color:#7a7156; line-height:1.4;">'+esc(sc.setup.slice(0,70))+(sc.setup.length>70?'…':'')+'</div>' : '')+
       '<div style="display:flex; align-items:center; gap:6px; margin-top:8px; flex-wrap:wrap;">'+
@@ -2064,7 +2089,7 @@ function renderStickyLayer(){
     '<div class="note-dock">'+
       '<div class="note-stack">'+
         '<div class="note-stack-sheet"></div><div class="note-stack-sheet"></div>'+
-        '<div class="note-stack-sheet note-stack-top" id="noteStackTop">+</div>'+
+        '<div class="note-stack-sheet note-stack-top" id="noteStackTop" tabindex="0" role="button" aria-label="Add a sticky note">+</div>'+
       '</div>'+
       '<div class="note-stack-hint">Drag or click to grab a note</div>'+
     '</div>'+
@@ -2130,6 +2155,21 @@ function attachStickyInputHandlers(wrap, attach){
       state.notes.push(note);
       renderStickyLayer();
       startNoteDrag(e, note); // pulling from the stack is just a drag that starts on a brand-new note
+    });
+    // Keyboard path: there's no cursor to drop the note under, so place it beside the
+    // dock and focus its textarea instead of starting a drag.
+    stackTop.addEventListener('keydown', function(e){
+      if(e.key!=='Enter' && e.key!==' ') return;
+      e.preventDefault();
+      var note = newNote(attach, '',
+        clamp(window.innerWidth - STICKY_W - 90, 0, window.innerWidth-STICKY_W),
+        clamp(240, 0, window.innerHeight-STICKY_H));
+      state.notes.push(note);
+      selectedNoteId = note.id;
+      debounceSaveNotes();
+      renderStickyLayer();
+      var ta = document.querySelector('.sticky-note[data-noteid="'+note.id+'"] textarea');
+      if(ta) ta.focus();
     });
   }
 }
@@ -2800,6 +2840,14 @@ function handleClick(e){
     debounceSave(); render(); return;
   }
 
+  if(action==='moveScenario'){
+    var sIdx = parseInt(t.getAttribute('data-idx'),10), sDir = parseInt(t.getAttribute('data-dir'),10);
+    var scs2 = state.draft.scenarios;
+    var sTo = sIdx+sDir;
+    if(sTo<0 || sTo>=scs2.length) return;
+    var sTmp = scs2[sIdx]; scs2[sIdx]=scs2[sTo]; scs2[sTo]=sTmp;
+    debounceSave(); render(); return;
+  }
   if(action==='moveLane'){
     var idx = parseInt(t.getAttribute('data-idx'),10), dir = parseInt(t.getAttribute('data-dir'),10);
     var opts = state.draft.scenarios[state.scenarioIndex].options;
