@@ -23,9 +23,10 @@
 // Required env vars (auto-injected by the integration above):
 //   REDIS_URL
 //
-// Request contract: POST { op: 'get'|'set'|'list'|'listByUser'|'coachLogin', ... }
+// Request contract: POST { op: 'get'|'set'|'delete'|'list'|'listByUser'|'coachLogin', ... }
 //   get        -> { value: string } | null
 //   set        -> { ok: true }  (value must be a string — callers JSON.stringify first)
+//   delete     -> { ok: true }  (same open access as get/set — see the note below)
 //   list       -> { keys: string[] }  (key doubles as the prefix to match)
 //                 COACH ONLY: requires a valid x-coach-token header.
 //   listByUser -> { drafts: object[] }  ({ key: 'draft:', username }); open to
@@ -47,10 +48,11 @@ const crypto = require('crypto');
 // What this gate does and does not cover, worth being precise about:
 //   `list` (bulk key enumeration) is coach-only. That is the operation that
 //   would otherwise let anyone dump every draft in the database, so it is the
-//   one that matters most. `get`/`set` on an already-known key stay open,
-//   because students have no accounts and must still read and write their own
-//   drafts. Guessing a 5-char draft id therefore remains possible; closing that
-//   needs real per-student auth, which is the Synthesis portal's job later.
+//   one that matters most. `get`/`set`/`delete` on an already-known key stay
+//   open, because students have no accounts and must still read, write, and
+//   delete their own drafts. Guessing a 5-char draft id therefore remains
+//   possible; closing that needs real per-student auth, which is the
+//   Synthesis portal's job later.
 const COACH_TOKEN_HEADER = 'x-coach-token';
 const TOKEN_TTL_MS = 8 * 60 * 60 * 1000; // one coaching session
 
@@ -193,6 +195,12 @@ module.exports = async (req, res) => {
         return;
       }
       await redis.set(key, value);
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    if (op === 'delete') {
+      await redis.del(key);
       res.status(200).json({ ok: true });
       return;
     }
