@@ -13,3 +13,9 @@ node_modules/
 *.local.md
 *.local.json
 CLAUDE.local.md
+
+# Student roster and anything generated from it — real names, ages and parent emails.
+# Blanket *.csv rather than the one filename: nothing here needs a CSV committed, and
+# the next spreadsheet dropped in the root shouldn't depend on someone remembering.
+*Supercollaborators*
+*.csv
