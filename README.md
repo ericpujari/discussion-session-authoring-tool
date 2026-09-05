@@ -46,8 +46,10 @@ runs, but every save silently no-ops.
   username — there are no accounts or passwords. Typing someone else's username reaches
   their drafts (view, rename, delete). This is accepted for now; closing it needs real
   per-student accounts, which is a separate, larger piece of work.
-- The two built-in example drafts use the username `Example` — anyone who types that
-  can rename or delete them.
+- Opening an example session from the home screen is a read-only preview — nothing it
+  contains is ever saved, so a student can explore freely without creating a draft. The
+  two seeded copies that sit in the coach inbox (`EXAMPLE-HMG`, `EXAMPLE-AOG`) still use
+  the username `Example`, so anyone who types that can still rename or delete those two.
 - The coach inbox password (`COACH_PASSWORD`) has no lockout on repeated wrong guesses,
   and a successful coach sign-in issues a token with no identity attached, valid for 8
   hours with no way to revoke it early.

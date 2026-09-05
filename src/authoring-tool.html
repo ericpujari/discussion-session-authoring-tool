@@ -859,6 +859,7 @@ function genCode(){
 function wordCount(t){ t=(t||'').trim(); return t? t.split(/\s+/).length : 0; }
 var isDirty = false;
 function debounceSave(){
+  if(state.draft && state.draft.isExample) return;
   isDirty = true;
   setSaveIndicator('unsaved');
   // Fresh edit: cancel any pending retry (it would carry a stale snapshot) and hand
@@ -1162,6 +1163,11 @@ function buildExampleDraft(key){
   var d = {
     id: genCode(),
     studentName: 'Example',
+    // Read-only preview. Every save path checks this and bails, so exploring an example
+    // never writes anything. Before the flag existed, the first keystroke autosaved a
+    // copy owned by "Example": invisible to the student under their own username, and
+    // junk in the coach inbox.
+    isExample: true,
     createdAt: Date.now(), updatedAt: Date.now(),
     status: 'draft',
     title: src.title, bigIdea: src.bigIdea,
@@ -1239,6 +1245,7 @@ function setSaveIndicator(status){
 }
 function saveDraft(){
   if(!hasStorage || !state.draft) return;
+  if(state.draft.isExample) return;
   // Any armed retry is stale the moment we send newer content.
   if(saveRetryTimer){ clearTimeout(saveRetryTimer); saveRetryTimer = null; }
   var draftId = state.draft.id;
@@ -1465,6 +1472,8 @@ function listModerationRecords(){
 function notesKey(draftId){ return 'notes:'+draftId; }
 function loadNotes(draftId){
   if(!hasStorage) return Promise.resolve([]);
+  // An example's id is minted fresh on every open, so there is never anything stored.
+  if(state.draft && state.draft.isExample && state.draft.id===draftId) return Promise.resolve([]);
   return window.storage.get(notesKey(draftId), false).then(function(r){
     if(!r) return [];
     try{ var arr = JSON.parse(r.value); return Array.isArray(arr) ? arr : []; }catch(e){ return []; }
@@ -1472,12 +1481,14 @@ function loadNotes(draftId){
 }
 var notesDirty = false, notesSaveTimer = null;
 function debounceSaveNotes(){
+  if(state.draft && state.draft.isExample) return;
   notesDirty = true;
   if(notesSaveTimer) clearTimeout(notesSaveTimer);
   notesSaveTimer = setTimeout(saveNotes, 600);
 }
 function saveNotes(){
   if(!hasStorage || !state.draft) return;
+  if(state.draft.isExample) return;
   notesDirty = false;
   window.storage.set(notesKey(state.draft.id), JSON.stringify(state.notes), false).catch(function(e){
     console.error('notes save failed', e);
@@ -1662,15 +1673,20 @@ function railHtml(){
     }
     return html;
   }).join('');
+  // An example has no code to return to and never saves, so the rail must advertise
+  // neither. setSaveIndicator() looks its element up by id and no-ops when absent, so
+  // omitting the live indicator here needs no change there.
   return ''+
   '<div class="rail">'+
-    '<div class="rail-code">CODE ' + esc(d.id) + '</div>'+
-    '<div class="rail-name">'+esc(d.studentName)+'\'s session</div>'+
+    (d.isExample? '' : '<div class="rail-code">CODE ' + esc(d.id) + '</div>')+
+    '<div class="rail-name">'+(d.isExample? 'Example session' : esc(d.studentName)+'\'s session')+'</div>'+
     rows+
     '<div class="rail-spacer"></div>'+
-    '<span id="saveIndicator" class="rail-save-indicator '+saveStatus+'">'+saveStatusText(saveStatus)+'</span>'+
+    (d.isExample
+      ? '<span class="rail-save-indicator">Not saved</span>'
+      : '<span id="saveIndicator" class="rail-save-indicator '+saveStatus+'">'+saveStatusText(saveStatus)+'</span>')+
     '<div class="rail-bottom">'+
-      '<button class="btn btn-ghost-light btn-small" data-action="goHome">← Save &amp; exit</button>'+
+      '<button class="btn btn-ghost-light btn-small" data-action="goHome">'+(d.isExample? '← Back home' : '← Save &amp; exit')+'</button>'+
     '</div>'+
   '</div>';
 }
@@ -1682,7 +1698,10 @@ function renderShellDraft(){
   else if(state.screen==='halftimeEditor') body = renderHalftimeEditor();
   else if(state.screen==='reflection') body = renderReflection();
   else if(state.screen==='review') body = renderReview();
-  return '<div class="shell">'+railHtml()+'<div class="main">'+body+'</div></div>';
+  var exampleBanner = state.draft.isExample
+    ? '<div class="banner">👀 <span><strong>Example session</strong> — have a look around and try things out. Changes here aren\'t saved.</span></div>'
+    : '';
+  return '<div class="shell">'+railHtml()+'<div class="main">'+exampleBanner+body+'</div></div>';
 }
 
 /* ---------- Setup ---------- */
@@ -2031,9 +2050,10 @@ function renderReview(){
     '<h3>Ready?</h3>'+
     '<div class="review-actions">'+
       (AI_ASSISTANT_ENABLED? '<button class="btn btn-ghost" data-action="askCoachWhole">💬 Ask my assistant to review everything</button>' : '')+
-      '<button class="btn btn-primary" data-action="submitToCoach">Submit to my coach</button>'+
+      (d.isExample? '' : '<button class="btn btn-primary" data-action="submitToCoach">Submit to my coach</button>')+
       '<button class="btn btn-ghost" data-action="exportMarkdown">⬇ Download as Markdown</button>'+
     '</div>'+
+    (d.isExample? '<div class="hint" style="margin-top:12px;">This is an example, so there\'s nothing to send. Head home to start a session of your own — you can still download this one to keep.</div>' : '')+
   '</div>';
 }
 
@@ -3115,6 +3135,7 @@ function handleClick(e){
   if(action==='removereflectionOpt'){ var ri=parseInt(t.getAttribute('data-oidx'),10); state.draft.reflection.options.splice(ri,1); debounceSave(); render(); return; }
 
   if(action==='submitToCoach'){
+    if(state.draft.isExample) return; // the button is hidden for examples; this is the backstop
     var blockReason = firstIncompleteSubmitReason(state.draft);
     if(blockReason){ state.submitError = blockReason; render(); return; }
     state.submitError = '';
