@@ -10,3 +10,10 @@
 *.md
 reference/
 docs/
+
+# Same reasoning, higher stakes: the student roster CSV that lives in the repo root
+# holds names, ages and parent emails. Nothing the app fetches at runtime is a CSV or
+# an env file (.env.example is contributor documentation, not a served asset), so
+# excluding both classes outright is free.
+*.csv
+.env*
