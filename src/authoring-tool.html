@@ -91,6 +91,7 @@
   .btn-ghost-light{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.25); color:#F2EEE1;}
   .btn-ghost-light:hover{background:rgba(255,255,255,.16);}
   .btn-small{padding:6px 12px; font-size:12.5px; border-radius:999px;}
+  .btn-large{padding:15px 26px; font-size:16.5px;}
   .btn-icon{width:32px; height:32px; padding:0; border-radius:999px; border:1.5px solid var(--line); background:#fff;}
   .btn-danger-text{color:#9B3B34; background:transparent; border:none; font-size:13px; font-weight:600;}
 
@@ -137,6 +138,14 @@
   .resume-match-row.with-actions{display:flex; align-items:center; justify-content:space-between; gap:10px;}
   .resume-match-actions{display:flex; gap:6px; flex-shrink:0;}
   .resume-match-actions .btn-icon{width:28px; height:28px; font-size:13px;}
+  .feedback-callout{
+    max-width:460px; margin:20px auto 0; background:var(--lane-c-soft); border:1.5px solid var(--lane-c-line);
+    border-radius:var(--radius); padding:26px 24px; text-align:center; box-shadow:var(--shadow);
+  }
+  .feedback-callout h3{color:var(--ink); font-size:20px; margin-bottom:8px;}
+  .feedback-callout p{color:var(--ink-soft); font-size:14px; margin:0 0 18px; line-height:1.5;}
+  .feedback-callout .btn-primary{background:var(--lane-c); color:#fff;}
+  .feedback-callout .btn-primary:hover{background:#9c6519;}
   .example-sessions{max-width:460px; margin:30px auto 0; text-align:center;}
   .example-sessions h3{color:#fff; font-size:15px; margin-bottom:4px;}
   .example-sessions p{color:#93A2B3; font-size:13px; margin-bottom:14px;}
@@ -1665,6 +1674,13 @@ function renderHome(){
             '<p class="hint">Lost the link? Ask your coach to send it again.</p>')+
       '</div>'+
     '</div>'+
+    (signedIn && FEEDBACK_ENABLED?
+      '<div class="feedback-callout">'+
+        '<h3>💬 Tell us what you think</h3>'+
+        '<p>This is a beta test — your feedback shapes what we build next. It only takes a minute.</p>'+
+        '<button class="btn btn-primary btn-large" data-action="openFeedback">Give feedback →</button>'+
+      '</div>'
+    : '')+
     '<div class="example-sessions">'+
       '<h3>Or explore an example session</h3>'+
       '<p>Two fully-written sessions, already loaded — see what a finished draft looks like.</p>'+
@@ -1673,7 +1689,6 @@ function renderHome(){
         '<div class="resume-match-row" data-action="openExampleDraft" data-example="askOrGuess"><h4>Ask or Guess?</h4><p>6 scenarios · 2 options each</p></div>'+
       '</div>'+
     '</div>'+
-    (signedIn && FEEDBACK_ENABLED? '<a class="home-footer-link" data-action="openFeedback">💬 How do you like this tool? Give us feedback →</a>' : '')+
     (signedIn? '<a class="home-footer-link" data-action="studentSignOut">Not '+esc(window.storage.studentUsername())+'? Sign out</a>' : '')+
     '<a class="home-footer-link" data-action="goInbox">I\'m a coach — open the review inbox →</a>'+
   '</div>';
@@ -1702,7 +1717,10 @@ function renderFeedback(){
     (state.feedbackError? '<div class="banner">⚠️ '+esc(state.feedbackError)+'</div>' : '')+
     '<div class="home-cards single">'+
       '<div class="home-card">'+
-        '<div class="field"><textarea id="feedbackText" maxlength="2000" placeholder="What do you like? What\'s confusing or annoying? What would make this better?" style="min-height:180px;"></textarea></div>'+
+        '<div class="field"><label>Things you like</label><textarea id="feedbackLikes" maxlength="800" placeholder="What\'s working well for you?"></textarea></div>'+
+        '<div class="field"><label>Things that are confusing and/or frustrating</label><textarea id="feedbackFrustrations" maxlength="800" placeholder="What tripped you up, or got annoying?"></textarea></div>'+
+        '<div class="field"><label>Other thoughts and ideas</label><textarea id="feedbackOther" maxlength="800" placeholder="Anything else you\'d want us to know?"></textarea></div>'+
+        '<div class="hint" style="margin-bottom:14px;">Fill in whichever ones apply — even just one is genuinely helpful.</div>'+
         '<div class="home-card-actions">'+
           '<button class="btn btn-primary" data-action="submitFeedback"'+(state.feedbackSending?' disabled':'')+'>'+(state.feedbackSending?'Sending…':'Send feedback →')+'</button>'+
         '</div>'+
@@ -2304,11 +2322,19 @@ function renderShellInbox(){
 }
 function renderShellInboxFeedback(){
   var rows = state.inboxFeedbackList.length ? state.inboxFeedbackList.map(function(f){
+    // Three labeled sections, each shown only if the student actually filled it in.
+    // f.text is a fallback for anything submitted before the single box was split
+    // into three, so an old entry still renders instead of showing nothing.
+    var sections = '';
+    if(f.likes) sections += '<p style="margin-top:8px;"><b>👍 Likes:</b> '+esc(f.likes)+'</p>';
+    if(f.frustrations) sections += '<p style="margin-top:8px;"><b>😕 Confusing/frustrating:</b> '+esc(f.frustrations)+'</p>';
+    if(f.other) sections += '<p style="margin-top:8px;"><b>💭 Other thoughts:</b> '+esc(f.other)+'</p>';
+    if(!sections && f.text) sections = '<p style="margin-top:8px;">'+esc(f.text)+'</p>';
     return ''+
-    '<div class="inbox-row" style="cursor:default;">'+
-      '<div class="ir-left"><h4>'+esc(f.username||'Unknown')+'</h4>'+
-        '<p style="white-space:pre-wrap; font-family:var(--font-body); font-size:13.5px; color:var(--ink); margin-top:6px; max-width:640px;">'+esc(f.text)+'</p>'+
-        '<p style="margin-top:6px;">'+timeAgo(f.createdAt)+'</p>'+
+    '<div class="inbox-row" style="cursor:default; align-items:flex-start;">'+
+      '<div class="ir-left" style="max-width:640px;"><h4>'+esc(f.username||'Unknown')+'</h4>'+
+        '<div style="white-space:pre-wrap; font-family:var(--font-body); font-size:13.5px; color:var(--ink);">'+sections+'</div>'+
+        '<p style="margin-top:8px;">'+timeAgo(f.createdAt)+'</p>'+
       '</div>'+
     '</div>';
   }).join('') : (state.inboxFeedbackLoading
@@ -3115,14 +3141,23 @@ function handleClick(e){
   if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; state.feedbackSent=false; state.feedbackError=''; state.feedbackSending=false; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
   if(action==='openFeedback'){ state.feedbackSent=false; state.feedbackError=''; state.screen='feedback'; render(); return; }
   if(action==='submitFeedback'){
-    var feedbackEl = document.getElementById('feedbackText');
-    var feedbackText = feedbackEl ? feedbackEl.value.trim() : '';
-    if(!feedbackText){ state.feedbackError='Type something before sending — even a sentence helps.'; render(); return; }
+    var likesEl = document.getElementById('feedbackLikes');
+    var frustrationsEl = document.getElementById('feedbackFrustrations');
+    var otherEl = document.getElementById('feedbackOther');
+    var feedbackLikes = likesEl ? likesEl.value.trim() : '';
+    var feedbackFrustrations = frustrationsEl ? frustrationsEl.value.trim() : '';
+    var feedbackOther = otherEl ? otherEl.value.trim() : '';
+    if(!feedbackLikes && !feedbackFrustrations && !feedbackOther){
+      state.feedbackError='Fill in at least one box before sending — even a sentence helps.';
+      render(); return;
+    }
     var feedbackUsername = window.storage.studentUsername();
     state.feedbackSending=true; state.feedbackError=''; render();
     var feedbackId = genCode();
     window.storage.set('feedback:'+feedbackId, JSON.stringify({
-      id: feedbackId, username: feedbackUsername, text: feedbackText, createdAt: Date.now()
+      id: feedbackId, username: feedbackUsername,
+      likes: feedbackLikes, frustrations: feedbackFrustrations, other: feedbackOther,
+      createdAt: Date.now()
     })).then(function(){
       state.feedbackSending=false; state.feedbackSent=true; render();
     }).catch(function(e){
