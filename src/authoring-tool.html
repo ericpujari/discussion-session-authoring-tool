@@ -794,6 +794,12 @@ function ppIconFor(text){
    (and point askCoach() at a proxy instead of api.anthropic.com) to re-enable later. */
 var AI_ASSISTANT_ENABLED = false;
 
+/* Master switch for the student feedback tool — built for this one beta test, not meant
+   to carry forward. Off = no home-screen entry point, no coach-side feedback list; the
+   feedback: storage prefix (see api/storage.js) can be left alone or cleaned up whenever.
+   Flip to false (not a deletion) once the beta ends. */
+var FEEDBACK_ENABLED = true;
+
 /* Master switch for real icon search against the Noun Project, via a serverless proxy
    that holds the API credentials (see /api/noun-project-search.js — the key must never
    reach the browser). Off = the icon description field behaves as before (a design team
@@ -859,7 +865,9 @@ var state = {
   iconSearchError: '',
   iconEmbedPending: null,   // {scenarioIndex, optionIndex} while a clicked result is being embedded
   iconEmbedError: '',
-  submitError: ''    // set when "Submit to my coach" is blocked by an incomplete section
+  submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
+  feedbackSending: false, feedbackSent: false, feedbackError: '',  // beta-test feedback tool — see FEEDBACK_ENABLED
+  inboxFeedbackList: [], inboxFeedbackLoading: false, inboxFeedbackError: ''
 };
 
 var REDIRECT_MESSAGE_1 = "This assistant is here to help you build your own Discussion Session for Synthesis — things like scenario setups, options, and questions other students will discuss. Let's focus on that. What part of your session would you like help with?";
@@ -1602,11 +1610,13 @@ function render(){
   else if(state.screen==='inbox') html = renderShellInbox();
   else if(state.screen==='inboxDraft') html = renderShellInboxDraft();
   else if(state.screen==='inboxFlagged') html = renderShellInboxFlagged();
+  else if(state.screen==='inboxFeedback') html = renderShellInboxFeedback();
   else if(state.screen==='playerPreview') html = renderPlayerPreview();
+  else if(state.screen==='feedback') html = renderFeedback();
   else html = renderShellDraft();
   app.innerHTML = html;
   attachGlobalHandlers();
-  if(state.screen!=='home' && state.screen!=='coachLogin' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='playerPreview' && state.draft){
+  if(state.screen!=='home' && state.screen!=='coachLogin' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='inboxFeedback' && state.screen!=='playerPreview' && state.screen!=='feedback' && state.draft){
     if(AI_ASSISTANT_ENABLED) renderCoachOverlay();
     renderStickyLayer();
   }
@@ -1663,8 +1673,42 @@ function renderHome(){
         '<div class="resume-match-row" data-action="openExampleDraft" data-example="askOrGuess"><h4>Ask or Guess?</h4><p>6 scenarios · 2 options each</p></div>'+
       '</div>'+
     '</div>'+
+    (signedIn && FEEDBACK_ENABLED? '<a class="home-footer-link" data-action="openFeedback">💬 How do you like this tool? Give us feedback →</a>' : '')+
     (signedIn? '<a class="home-footer-link" data-action="studentSignOut">Not '+esc(window.storage.studentUsername())+'? Sign out</a>' : '')+
     '<a class="home-footer-link" data-action="goInbox">I\'m a coach — open the review inbox →</a>'+
+  '</div>';
+}
+
+/* ============================= FEEDBACK (beta test only — see FEEDBACK_ENABLED) ============================= */
+function renderFeedback(){
+  if(state.feedbackSent){
+    return ''+
+    '<div class="home-wrap">'+
+      '<div class="home-hero">'+
+        '<div class="glass-pill"><span class="eyebrow">FEEDBACK</span></div>'+
+        '<h1>Thanks!</h1>'+
+        '<p class="visibility-note">Your feedback was sent. It really helps us make this better.</p>'+
+      '</div>'+
+      '<button class="btn btn-primary" data-action="goHome">← Back home</button>'+
+    '</div>';
+  }
+  return ''+
+  '<div class="home-wrap">'+
+    '<div class="home-hero">'+
+      '<div class="glass-pill"><span class="eyebrow">FEEDBACK</span></div>'+
+      '<h1>How do you like this tool?</h1>'+
+      '<p class="visibility-note">Send us suggestions for improvement here:</p>'+
+    '</div>'+
+    (state.feedbackError? '<div class="banner">⚠️ '+esc(state.feedbackError)+'</div>' : '')+
+    '<div class="home-cards single">'+
+      '<div class="home-card">'+
+        '<div class="field"><textarea id="feedbackText" maxlength="2000" placeholder="What do you like? What\'s confusing or annoying? What would make this better?" style="min-height:180px;"></textarea></div>'+
+        '<div class="home-card-actions">'+
+          '<button class="btn btn-primary" data-action="submitFeedback"'+(state.feedbackSending?' disabled':'')+'>'+(state.feedbackSending?'Sending…':'Send feedback →')+'</button>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<a class="home-footer-link" data-action="goHome">← Back home</a>'+
   '</div>';
 }
 
@@ -1725,6 +1769,33 @@ function loadInbox(){
       state.flaggedList=[]; render();
     });
   }
+}
+
+/* ---------- Feedback tool (beta test only — see FEEDBACK_ENABLED) ---------- */
+function listAllFeedback(){
+  if(!hasStorage) return Promise.resolve([]);
+  return window.storage.list('feedback:').then(function(r){
+    var keys = (r && r.keys) || [];
+    return Promise.all(keys.map(function(k){
+      return window.storage.get(k).then(function(res){
+        try{ return JSON.parse(res.value); }catch(e){ return null; }
+      });
+    }));
+  }).then(function(list){
+    return list.filter(Boolean).sort(function(a,b){ return b.createdAt - a.createdAt; });
+  });
+}
+function loadInboxFeedback(){
+  state.inboxFeedbackError=''; state.inboxFeedbackLoading=true;
+  listAllFeedback().then(function(list){
+    state.inboxFeedbackList=list; state.inboxFeedbackLoading=false; render();
+  }).catch(function(e){
+    console.error('feedback load failed', e);
+    state.inboxFeedbackLoading=false;
+    if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+    state.inboxFeedbackError='Couldn\'t reach storage, so feedback can\'t be listed right now. Try again in a moment.';
+    state.inboxFeedbackList=[]; render();
+  });
 }
 
 /* ============================= SHELL (draft screens) ============================= */
@@ -2221,12 +2292,36 @@ function renderShellInbox(){
     '<div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:26px;">'+
       '<div><div class="eyebrow">COACH INBOX</div><h1 style="color:#fff; font-size:28px; margin-top:6px;">Drafts to review</h1></div>'+
       '<div style="display:flex; align-items:center; gap:10px;">'+
+        (FEEDBACK_ENABLED? '<button class="btn btn-ghost-light" data-action="openInboxFeedback">💬 Feedback</button>' : '')+
         '<button class="btn btn-ghost-light" data-action="goHome">← Back home</button>'+
         '<button class="btn btn-ghost-light" data-action="coachSignOut">Sign out</button>'+
       '</div>'+
     '</div>'+
     errorBanner+
     flaggedSection+
+    rows+
+  '</div>';
+}
+function renderShellInboxFeedback(){
+  var rows = state.inboxFeedbackList.length ? state.inboxFeedbackList.map(function(f){
+    return ''+
+    '<div class="inbox-row" style="cursor:default;">'+
+      '<div class="ir-left"><h4>'+esc(f.username||'Unknown')+'</h4>'+
+        '<p style="white-space:pre-wrap; font-family:var(--font-body); font-size:13.5px; color:var(--ink); margin-top:6px; max-width:640px;">'+esc(f.text)+'</p>'+
+        '<p style="margin-top:6px;">'+timeAgo(f.createdAt)+'</p>'+
+      '</div>'+
+    '</div>';
+  }).join('') : (state.inboxFeedbackLoading
+    ? '<div class="empty-state">Loading feedback…</div>'
+    : (state.inboxFeedbackError
+      ? ''
+      : '<div class="empty-state">No feedback yet.</div>'));
+  var errorBanner = state.inboxFeedbackError ? '<div class="banner">⚠️ '+esc(state.inboxFeedbackError)+'</div>' : '';
+  return ''+
+  '<div class="home-wrap" style="padding-top:44px;">'+
+    '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
+    '<div style="margin-bottom:26px;"><div class="eyebrow">COACH INBOX</div><h1 style="color:#fff; font-size:28px; margin-top:6px;">Student feedback</h1><p style="color:#C7D2DD; margin-top:6px;">Beta-test only — this tool goes away once the test ends.</p></div>'+
+    errorBanner+
     rows+
   '</div>';
 }
@@ -3017,7 +3112,27 @@ function handleClick(e){
     enterDraft(exampleDraft, 'storyboard');
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; state.feedbackSent=false; state.feedbackError=''; state.feedbackSending=false; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
+  if(action==='openFeedback'){ state.feedbackSent=false; state.feedbackError=''; state.screen='feedback'; render(); return; }
+  if(action==='submitFeedback'){
+    var feedbackEl = document.getElementById('feedbackText');
+    var feedbackText = feedbackEl ? feedbackEl.value.trim() : '';
+    if(!feedbackText){ state.feedbackError='Type something before sending — even a sentence helps.'; render(); return; }
+    var feedbackUsername = window.storage.studentUsername();
+    state.feedbackSending=true; state.feedbackError=''; render();
+    var feedbackId = genCode();
+    window.storage.set('feedback:'+feedbackId, JSON.stringify({
+      id: feedbackId, username: feedbackUsername, text: feedbackText, createdAt: Date.now()
+    })).then(function(){
+      state.feedbackSending=false; state.feedbackSent=true; render();
+    }).catch(function(e){
+      console.error('feedback submit failed', e);
+      state.feedbackSending=false;
+      state.feedbackError="Couldn't send that — try again in a moment.";
+      render();
+    });
+    return;
+  }
   if(action==='goInbox'){
     if(!window.storage.hasCoachToken()){
       state.screen='coachLogin'; state.coachAuthError=''; state.coachAuthBusy=false; render(); return;
@@ -3025,6 +3140,12 @@ function handleClick(e){
     state.screen='inbox';
     render();
     loadInbox();
+    return;
+  }
+  if(action==='openInboxFeedback'){
+    state.screen='inboxFeedback';
+    render();
+    loadInboxFeedback();
     return;
   }
   if(action==='coachLogin'){

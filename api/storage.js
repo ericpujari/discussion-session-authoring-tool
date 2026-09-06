@@ -33,6 +33,11 @@
 //                 belonging to the x-student-token holder.
 //   coachLogin -> { token, expiresAt }  ({ password }); 401 on a bad password.
 //
+// Key prefixes a student token may `set`, beyond draft:/notes:/moduser: above —
+//   feedback:<id> -> beta-test-only feedback tool (see FEEDBACK_ENABLED in the
+//                     client). Write-only for students: a coach reads these back
+//                     via list/get, same as the inbox does for drafts.
+//
 // Required env vars:
 //   REDIS_URL             (auto-injected by the Vercel Redis integration)
 //   COACH_PASSWORD        (set by hand; gates the coach inbox)
@@ -231,6 +236,22 @@ async function authorizeStudentKey(redis, op, key, value, owner) {
 
   if (key.startsWith('moduser:')) {
     if (normalizeUsername(key.slice('moduser:'.length)) !== owner) return DENY;
+    return null;
+  }
+
+  // Built for the current student beta test only (see FEEDBACK_ENABLED in the client).
+  // One-way: a student can write their own feedback but never read any back — there's
+  // nothing here for them to resume or edit, unlike a draft. Only a coach (who bypasses
+  // this whole function) ever reads these, via the same list/get ops the inbox uses.
+  if (key.startsWith('feedback:')) {
+    if (op !== 'set') return { status: 403, error: 'Feedback can only be read by a coach.' };
+    let claimed;
+    try {
+      claimed = normalizeUsername(JSON.parse(value).username);
+    } catch (e) {
+      return { status: 400, error: 'That feedback could not be read.' };
+    }
+    if (claimed !== owner) return DENY;
     return null;
   }
 
