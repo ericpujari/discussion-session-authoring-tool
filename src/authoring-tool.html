@@ -1483,11 +1483,31 @@ function ensureExampleDraftsSeeded(){
   return Promise.all(keys.map(function(key){
     var id = EXAMPLE_INBOX_IDS[key];
     return window.storage.get('draft:'+id, true).then(function(existing){
-      if(existing) return;
-      var d = buildExampleDraft(key);
-      d.id = id;
-      d.status = 'submitted';
-      return window.storage.set('draft:'+id, JSON.stringify(d), true);
+      var fresh = buildExampleDraft(key);
+      fresh.id = id;
+      if(!existing){
+        fresh.status = 'submitted';
+        return window.storage.set('draft:'+id, JSON.stringify(fresh), true);
+      }
+      // Already seeded before. Re-sync the content on every load — title, scenarios,
+      // selected icons, whatever EXAMPLE_SESSIONS says right now — so an edit to it
+      // (like giving every option a real icon) reaches an already-seeded copy instead
+      // of sitting invisible in Redis forever, which is exactly what happened here:
+      // this draft was seeded once, then EXAMPLE_SESSIONS changed and this frozen
+      // copy never heard about it. Coach-specific fields carry over untouched, and
+      // updatedAt is pinned to the old value so this refresh never bumps the demo to
+      // the top of "most recently updated."
+      var old;
+      try { old = JSON.parse(existing.value); } catch(e){ old = null; }
+      if(!old) return window.storage.set('draft:'+id, JSON.stringify(fresh), true);
+      var merged = Object.assign({}, fresh, {
+        status: old.status || 'submitted',
+        coachNotes: old.coachNotes || [],
+        coachMessage: old.coachMessage || '',
+        createdAt: old.createdAt || fresh.createdAt,
+        updatedAt: old.updatedAt || fresh.updatedAt
+      });
+      return window.storage.set('draft:'+id, JSON.stringify(merged), true);
     }).catch(function(){});
   }));
 }
