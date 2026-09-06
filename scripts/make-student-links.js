@@ -78,11 +78,13 @@ if (!rows.length) fail('Roster is empty: ' + rosterPath);
 const header = rows[0].map(h => h.trim().toLowerCase());
 const userCol = header.indexOf('username');
 const nameCol = header.indexOf('name');
+const emailCol = header.indexOf('parent email');
 if (userCol === -1) fail("No 'Username' column in " + rosterPath + '. Found: ' + rows[0].join(', '));
 
 const origin = baseUrl.replace(/\/+$/, '');
 const seen = new Map();
 const out = [];
+const missingEmail = [];
 let skipped = 0;
 
 rows.slice(1).forEach((r, i) => {
@@ -96,9 +98,12 @@ rows.slice(1).forEach((r, i) => {
   seen.set(key, i + 2);
   const token = issueStudentToken(username);
   if (!token) fail('Could not build a token for "' + username + '" (row ' + (i + 2) + ').');
+  const email = emailCol === -1 ? '' : (r[emailCol] || '').trim();
+  if (emailCol !== -1 && !email) missingEmail.push(username);
   out.push({
     name: nameCol === -1 ? '' : (r[nameCol] || '').trim(),
     username: username,
+    email: email,
     link: origin + '/?s=' + encodeURIComponent(token),
   });
 });
@@ -106,11 +111,16 @@ rows.slice(1).forEach((r, i) => {
 if (!out.length) fail('No usable usernames found in ' + rosterPath);
 
 fs.writeFileSync(outPath,
-  'Name,Username,Link\n' +
-  out.map(s => [s.name, s.username, s.link].map(csvCell).join(',')).join('\n') + '\n');
+  'Name,Username,Parent Email,Link\n' +
+  out.map(s => [s.name, s.username, s.email, s.link].map(csvCell).join(',')).join('\n') + '\n');
 
 console.log('Wrote ' + out.length + ' links to ' + outPath);
 if (skipped) console.log('Skipped ' + skipped + ' row(s) with no username.');
+if (missingEmail.length) {
+  console.log('\nNo parent email on file for ' + missingEmail.length + ' student(s) — they\'re still in the\n' +
+              'file with an empty Parent Email cell, but a mail merge can\'t reach them that way:');
+  missingEmail.forEach(u => console.log('  - ' + u));
+}
 console.log('\nSpot-check one before sending:\n  ' + out[0].username + '  ' + out[0].link);
 console.log('\nThis file is a set of working credentials — it is gitignored, keep it out of email threads\n' +
             'other than the one-to-one messages to each student.');

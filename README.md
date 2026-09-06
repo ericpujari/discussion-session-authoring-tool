@@ -69,10 +69,11 @@ STUDENT_LINK_SECRET='<the same value set in Vercel>' \
     --out student-links.csv
 ```
 
-Outputs `Name,Username,Link` — paste it back into the roster spreadsheet as a mail-merge
-column. Rows with no username are skipped, and a duplicate username is a hard error
-(two students would otherwise share one set of drafts). Both the roster and the generated
-file are gitignored; the output is a set of working credentials.
+Outputs `Name,Username,Parent Email,Link` — ready to feed straight into a mail merge. Rows
+with no username are skipped, a duplicate username is a hard error (two students would
+otherwise share one set of drafts), and a roster row with no parent email on file is
+called out separately so it doesn't silently get missed. Both the roster and the
+generated file are gitignored; the output is a set of working credentials.
 
 ### Turning it on
 
