@@ -1468,6 +1468,9 @@ function studentLinkExpired(){
 // Fixed ids (not host genCode() output) so re-checking "does this already exist" is
 // idempotent across reloads/coaches, instead of reseeding a fresh copy every time.
 var EXAMPLE_INBOX_IDS = {heartMindGut: 'EXAMPLE-HMG', askOrGuess: 'EXAMPLE-AOG'};
+function isSeededExampleId(id){
+  return id==='EXAMPLE-HMG' || id==='EXAMPLE-AOG';
+}
 // Makes sure the two example sessions exist as real, persisted drafts so they show up
 // in the coach inbox like any submitted draft — reviewable, notable, markable. Only
 // writes a key the first time it's missing; never overwrites a coach's own edits/notes
@@ -2235,6 +2238,9 @@ function renderShellInboxDraft(){
       '<div class="review-actions">'+
         '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back for revisions</button>'+
         '<button class="btn btn-primary" data-action="markReviewed" data-id="'+esc(d.id)+'">Mark reviewed ✅</button>'+
+        // The two seeded examples are reference material, not a student's own work —
+        // keep them out of reach here rather than let a stray click remove them.
+        (isSeededExampleId(d.id) ? '' : '<button class="btn btn-ghost" data-action="deleteInboxDraft" data-id="'+esc(d.id)+'" style="margin-left:auto; color:#C0463A;">🗑️ Delete</button>')+
       '</div>'+
     '</div>'+
   '</div>';
@@ -3002,6 +3008,31 @@ function handleClick(e){
     state.screen='home';
     state.inboxList=[]; state.flaggedList=[]; state.inboxError=''; state.coachAuthError='';
     render();
+    return;
+  }
+  if(action==='deleteInboxDraft'){
+    var inboxDeleteId = t.getAttribute('data-id');
+    var inboxDeleteDraft = state.inboxList.filter(function(d){ return d.id===inboxDeleteId; })[0];
+    if(!inboxDeleteDraft) return;
+    if(isSeededExampleId(inboxDeleteId)) return; // belt and suspenders: the button is already hidden for these
+    if(!confirm('Delete "'+(inboxDeleteDraft.title||'Untitled')+'" by '+(inboxDeleteDraft.studentName||'Student')+'? This can\'t be undone.')) return;
+    // Notes are a separate key from the draft itself (see notesKey()) — clean up both,
+    // rather than leaving an orphaned notes:<id> behind with nothing left to attach to.
+    Promise.all([
+      window.storage.delete('draft:'+inboxDeleteId),
+      window.storage.delete(notesKey(inboxDeleteId))
+    ]).then(function(){
+      state.inboxList = state.inboxList.filter(function(d){ return d.id!==inboxDeleteId; });
+      state.inboxSelectedId = null;
+      state.screen = 'inbox';
+      render();
+    }).catch(function(e){
+      console.error('inbox delete failed', e);
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = "Couldn't delete that session — try again in a moment.";
+      state.screen = 'inbox';
+      render();
+    });
     return;
   }
   if(action==='openInboxDraft'){
