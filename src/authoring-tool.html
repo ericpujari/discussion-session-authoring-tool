@@ -489,6 +489,8 @@
   }
 
   /* ---------- Coach inbox ---------- */
+  .inbox-group{margin-bottom:26px;}
+  .inbox-group:last-child{margin-bottom:0;}
   .inbox-row{
     background:var(--paper); border-radius:12px; padding:16px 18px; display:flex; align-items:center; justify-content:space-between;
     box-shadow:var(--shadow-sm); margin-bottom:10px; cursor:pointer; border-left:5px solid var(--lane-b);
@@ -2140,19 +2142,39 @@ function renderReview(){
 }
 
 /* ============================= COACH INBOX (for the human coach) ============================= */
+// One row's markup — pulled out so the three priority groups below render
+// identically instead of three copies of the same template drifting apart.
+function renderInboxRow(d){
+  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
+  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
+  return ''+
+  '<div class="inbox-row" data-action="openInboxDraft" data-id="'+esc(d.id)+'">'+
+    '<div class="ir-left"><h4>'+esc(d.title||'Untitled')+' — <span style="font-weight:400;">'+esc(d.studentName)+'</span></h4><p>CODE '+esc(d.id)+' · updated '+timeAgo(d.updatedAt)+'</p></div>'+
+    '<div style="display:flex; align-items:center; gap:10px;">'+
+      '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'" title="Download as Markdown">⬇ Markdown</button>'+
+      '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
+    '</div>'+
+  '</div>';
+}
+// A submitted draft is the only one waiting on the coach to do anything, so it leads;
+// a still-drafting one has no action pending yet; a reviewed one is done. Each group
+// keeps listAllDrafts' existing most-recently-updated-first order.
+function renderInboxGroup(label, list){
+  if(!list.length) return '';
+  return '<div class="inbox-group">'+
+    '<h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+esc(label)+' ('+list.length+')</h3>'+
+    list.map(renderInboxRow).join('')+
+  '</div>';
+}
 function renderShellInbox(){
-  var rows = state.inboxList.length ? state.inboxList.map(function(d){
-    var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-    var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
-    return ''+
-    '<div class="inbox-row" data-action="openInboxDraft" data-id="'+esc(d.id)+'">'+
-      '<div class="ir-left"><h4>'+esc(d.title||'Untitled')+' — <span style="font-weight:400;">'+esc(d.studentName)+'</span></h4><p>CODE '+esc(d.id)+' · updated '+timeAgo(d.updatedAt)+'</p></div>'+
-      '<div style="display:flex; align-items:center; gap:10px;">'+
-        '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'" title="Download as Markdown">⬇ Markdown</button>'+
-        '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
-      '</div>'+
-    '</div>';
-  }).join('') : (state.inboxLoading
+  var submitted = state.inboxList.filter(function(d){ return d.status==='submitted'; });
+  var inProgress = state.inboxList.filter(function(d){ return d.status==='draft'; });
+  var reviewed = state.inboxList.filter(function(d){ return d.status==='reviewed'; });
+  var rows = state.inboxList.length ? (
+    renderInboxGroup('Ready for review', submitted)+
+    renderInboxGroup('In progress', inProgress)+
+    renderInboxGroup('Reviewed', reviewed)
+  ) : (state.inboxLoading
     ? '<div class="empty-state">Loading drafts…</div>'
     : (state.inboxError
       ? ''
@@ -2185,7 +2207,6 @@ function renderShellInbox(){
     '</div>'+
     errorBanner+
     flaggedSection+
-    '<h3 style="color:#fff; font-size:16px; margin-bottom:12px;">Drafts</h3>'+
     rows+
   '</div>';
 }
