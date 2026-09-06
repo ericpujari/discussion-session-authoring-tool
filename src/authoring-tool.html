@@ -3153,6 +3153,35 @@ function handleClick(e){
     return;
   }
 
+  // Both player-preview actions live here, above the "requires a loaded draft" guard
+  // below — exactly like exportMarkdownInbox just above, since the coach inbox never
+  // sets state.draft at all (renderShellInboxDraft reads state.inboxList directly on
+  // every render). Placed after that guard, a coach's click here used to be silently
+  // swallowed before either handler ever ran.
+  if(action==='openPlayerPreview'){
+    var ppKindAttr = t.getAttribute('data-kind');
+    var ppIdxAttr = t.getAttribute('data-idx');
+    var ppIdx = ppIdxAttr!==null ? parseInt(ppIdxAttr,10) : state.scenarioIndex;
+    if(state.screen==='inboxDraft'){
+      var ppInboxSource = state.inboxList.filter(function(x){ return x.id===state.inboxSelectedId; })[0];
+      if(ppInboxSource) state.draft = ppInboxSource;
+    }
+    state.ppStep = ppStepForKind(ppKindAttr, ppIdx);
+    state.ppChallengeIndex = 0;
+    state.ppReturnScreen = state.screen;
+    state.screen = 'playerPreview';
+    render(); return;
+  }
+  if(action==='closePlayerPreview'){
+    state.screen = state.ppReturnScreen || 'storyboard';
+    // Undo the lookup above on the way out — a coach's state.draft should never
+    // hold a student's draft outside of this preview. Left set, a later "Back
+    // home" from the inbox list would call saveDraft() on it via goHome, quietly
+    // rewriting that student's draft with a new updatedAt despite no real edit.
+    if(state.screen==='inboxDraft') state.draft = null;
+    render(); return;
+  }
+
   if(!state.draft) return; // remaining actions require a loaded draft
 
   if(action==='nav'){
@@ -3167,17 +3196,6 @@ function handleClick(e){
   if(action==='prevScenario'){ if(state.scenarioIndex>0){ state.scenarioIndex--; render(); } return; }
   if(action==='nextScenario'){ if(state.scenarioIndex<5){ state.scenarioIndex++; render(); } return; }
 
-  if(action==='openPlayerPreview'){
-    var ppKindAttr = t.getAttribute('data-kind');
-    var ppIdxAttr = t.getAttribute('data-idx');
-    var ppIdx = ppIdxAttr!==null ? parseInt(ppIdxAttr,10) : state.scenarioIndex;
-    state.ppStep = ppStepForKind(ppKindAttr, ppIdx);
-    state.ppChallengeIndex = 0;
-    state.ppReturnScreen = state.screen;
-    state.screen = 'playerPreview';
-    render(); return;
-  }
-  if(action==='closePlayerPreview'){ state.screen = state.ppReturnScreen || 'storyboard'; render(); return; }
   if(action==='searchIcon'){
     var scenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
     var optionIdx = parseInt(t.getAttribute('data-oidx'),10);
