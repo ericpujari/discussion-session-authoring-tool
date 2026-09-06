@@ -115,6 +115,10 @@ way to reach that student.
 - **`student-links.csv` and the roster CSV are both gitignored on purpose** — the links
   file is 83 working credentials. Don't attach it wholesale to a group email or shared
   doc; it's meant for a mail-merge into one-to-one messages.
+- **The inbox is grouped by what needs your attention**, not just sorted by recency:
+  "Ready for review" (submitted, waiting on you) leads, then "In progress" (still
+  drafting), then "Reviewed" (done). A group with nothing in it shows no heading at all,
+  so an inbox that's all-submitted looks exactly like a flat list.
 
 ## Troubleshooting
 
