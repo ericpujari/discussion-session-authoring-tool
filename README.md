@@ -40,12 +40,57 @@ project (Storage tab, or the Marketplace) — see `.env.example`'s comment on th
 variable for the one-time dashboard steps. Without a real `REDIS_URL`, `vercel dev` still
 runs, but every save silently no-ops.
 
+## Student access links
+
+Students don't have accounts or passwords. Each one gets a personal URL:
+
+```
+https://<your-app>.vercel.app/?s=c2NvdXQ0MjQ2.DIHw8ORBifW_cSGlQtif2D
+```
+
+The token is `base64url(username)` plus a truncated HMAC of that username, signed with
+`STUDENT_LINK_SECRET`. It is stateless — nothing is stored per student, and any link can
+be regenerated from the username plus the secret, so re-running the generator produces
+identical links. Opening the link signs the student in and remembers them in
+`localStorage`; a "Not you? Sign out" link on the home screen clears it.
+
+`api/storage.js` checks the token on every read and write: a draft can only be read,
+changed or deleted by the student whose name is on it, and `listByUser` uses the token's
+username rather than whatever the browser claims. Coaches, who sign in separately with
+`COACH_PASSWORD`, are exempt — the review inbox has to see everything.
+
+### Generating the links
+
+```bash
+STUDENT_LINK_SECRET='<the same value set in Vercel>' \
+  node scripts/make-student-links.js \
+    --roster "Synthesis Supercollaborators - Sheet1.csv" \
+    --base-url https://<your-app>.vercel.app \
+    --out student-links.csv
+```
+
+Outputs `Name,Username,Link` — paste it back into the roster spreadsheet as a mail-merge
+column. Rows with no username are skipped, and a duplicate username is a hard error
+(two students would otherwise share one set of drafts). Both the roster and the generated
+file are gitignored; the output is a set of working credentials.
+
+### Turning it on
+
+1. `openssl rand -base64 32` → set as `STUDENT_LINK_SECRET` in the Vercel project settings.
+2. Deploy. Enforcement is still off, so nothing changes for anyone yet.
+3. Set `STUDENT_LINKS_REQUIRED=1` and redeploy.
+4. Generate the links and send each student theirs.
+
+Unsetting `STUDENT_LINKS_REQUIRED` and redeploying is the rollback, and needs no code
+change. Env vars only take effect on a new deployment.
+
 ## Known limitations (current test deployment)
 
-- **No real student authentication.** Students identify themselves by typing a
-  username — there are no accounts or passwords. Typing someone else's username reaches
-  their drafts (view, rename, delete). This is accepted for now; closing it needs real
-  per-student accounts, which is a separate, larger piece of work.
+- **Access links are bearer credentials.** A student who forwards their link hands over
+  full access to their own sessions — there is no password behind it. Acceptable for a
+  supervised test; real accounts are the Synthesis portal's job later.
+- Links do not expire. The only way to revoke access is to rotate
+  `STUDENT_LINK_SECRET`, which invalidates every student's link at once.
 - Opening an example session from the home screen is a read-only preview — nothing it
   contains is ever saved, so a student can explore freely without creating a draft. The
   two seeded copies that sit in the coach inbox (`EXAMPLE-HMG`, `EXAMPLE-AOG`) still use

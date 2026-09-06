@@ -639,6 +639,41 @@
     var token = null;
     try { token = sessionStorage.getItem(TOKEN_STORE_KEY); } catch(e){ token = null; }
 
+    // The student token arrives in the link itself (?s=...). It goes to localStorage
+    // rather than sessionStorage because an 8-to-14-year-old should not have to dig the
+    // email out again every time they close the tab — a deliberately different trade-off
+    // from the coach token, which is a shared password and expires with the tab.
+    var STUDENT_HEADER = 'x-student-token';
+    var STUDENT_STORE_KEY = 'studentToken';
+    var studentToken = null;
+    try {
+      var fromUrl = /[?&]s=([^&#]+)/.exec(window.location.search);
+      // A freshly opened link always wins over whatever this browser remembered, so
+      // handing a kid a new link is enough to switch them over.
+      if(fromUrl) studentToken = decodeURIComponent(fromUrl[1]);
+    } catch(e){ studentToken = null; }
+    if(!studentToken){
+      try { studentToken = localStorage.getItem(STUDENT_STORE_KEY); } catch(e){ studentToken = null; }
+    }
+
+    function setStudentToken(t){
+      studentToken = t || null;
+      try {
+        if(studentToken) localStorage.setItem(STUDENT_STORE_KEY, studentToken);
+        else localStorage.removeItem(STUDENT_STORE_KEY);
+      } catch(e){ /* private mode: token stays in memory for this tab only */ }
+    }
+    if(studentToken) setStudentToken(studentToken);
+
+    // Display only — the server re-verifies the signature on every single request,
+    // so nothing here is trusted for access decisions.
+    function studentUsername(){
+      if(!studentToken) return '';
+      var b = String(studentToken).split('.')[0].replace(/-/g,'+').replace(/_/g,'/');
+      while(b.length % 4) b += '=';
+      try { return atob(b); } catch(e){ return ''; }
+    }
+
     function setToken(t){
       token = t || null;
       try {
@@ -650,6 +685,7 @@
     function call(body){
       var headers = {'Content-Type': 'application/json'};
       if(token) headers[TOKEN_HEADER] = token;
+      if(studentToken) headers[STUDENT_HEADER] = studentToken;
       var payload = JSON.stringify(body);
       var opts = {method: 'POST', headers: headers, body: payload};
       // keepalive is what lets a save fired during pagehide survive the unload, but the
@@ -662,7 +698,12 @@
             var e = new Error(err.error || ('Storage request failed: '+res.status));
             // Flagged so callers can bounce to the sign-in screen rather than showing
             // a generic "storage is down" banner for what is really an expired token.
-            if(res.status===401){ setToken(null); e.authRequired = true; }
+            // Two different expired credentials reach here; clearing the wrong one
+            // would sign a coach out of a student problem and vice versa.
+            if(res.status===401){
+              if(err.reason==='student'){ setStudentToken(null); e.studentAuthRequired = true; }
+              else { setToken(null); e.authRequired = true; }
+            }
             throw e;
           });
         }
@@ -683,7 +724,10 @@
         });
       },
       hasCoachToken: function(){ return !!token; },
-      coachSignOut: function(){ setToken(null); }
+      coachSignOut: function(){ setToken(null); },
+      hasStudentToken: function(){ return !!studentToken; },
+      studentUsername: studentUsername,
+      studentSignOut: function(){ setStudentToken(null); }
     };
   })();
 </script>
@@ -801,7 +845,7 @@ var state = {
   coachAuthError: '',
   coachAuthBusy: false,
   homeError: '',
-  resumeMatches: [],        // drafts found for the typed username on the "Resume a draft" card
+  resumeMatches: [], resumeLoading: false,        // drafts found for the typed username on the "Resume a draft" card
   dragScenarioIdx: null,
   dragLaneIdx: null,
   ppStep: 0,                 // player-preview: index into PP_SEQUENCE (scenarios + halftime + reflection, in session order)
@@ -1264,6 +1308,7 @@ function saveDraft(){
     // "Saved" then would be a lie about content the server hasn't seen.
     setSaveIndicator(isDirty ? 'unsaved' : 'saved');
   }).catch(function(e){
+    if(e && e.studentAuthRequired){ studentLinkExpired(); return; }
     console.error('save failed', e);
     isDirty = true;
     scheduleSaveRetry(draftId);
@@ -1393,6 +1438,33 @@ function listDraftsForUser(username){
   });
 }
 
+// With links on, identity comes from the token, so the drafts list can just load
+// itself whenever the student lands on the home screen — no username to type, and
+// nothing to press.
+function refreshMyDrafts(){
+  if(!window.storage.hasStudentToken()) return;
+  if(!hasStorage){ state.homeError='Saving isn\'t available in this preview, so sessions can\'t be resumed.'; render(); return; }
+  state.resumeLoading = true; state.homeError = ''; render();
+  listDraftsForUser(window.storage.studentUsername()).then(function(matches){
+    state.resumeLoading = false; state.resumeMatches = matches; render();
+  }).catch(function(e){
+    state.resumeLoading = false;
+    if(e && e.studentAuthRequired){ studentLinkExpired(); return; }
+    console.error('draft lookup failed', e);
+    state.homeError = 'Couldn\'t reach storage to look up your sessions. Your work is safe — try again in a moment.';
+    state.resumeMatches = []; render();
+  });
+}
+
+// A link that no longer verifies (secret rotated, or a mangled URL) should land the
+// student somewhere honest rather than looping on failed saves.
+function studentLinkExpired(){
+  state.draft = null; state.notes = []; state.resumeMatches = [];
+  state.resumeLoading = false; state.screen = 'home';
+  state.homeError = 'That link isn\'t valid any more. Ask your coach to send you a new one.';
+  render();
+}
+
 // Fixed ids (not host genCode() output) so re-checking "does this already exist" is
 // idempotent across reloads/coaches, instead of reseeding a fresh copy every time.
 var EXAMPLE_INBOX_IDS = {heartMindGut: 'EXAMPLE-HMG', askOrGuess: 'EXAMPLE-AOG'};
@@ -1517,6 +1589,7 @@ function render(){
 
 /* ============================= HOME ============================= */
 function renderHome(){
+  var signedIn = window.storage.hasStudentToken();
   var resumeMatchesHtml = '';
   if(state.resumeMatches && state.resumeMatches.length){
     resumeMatchesHtml = '<div class="resume-matches">'+
@@ -1542,14 +1615,19 @@ function renderHome(){
     (state.homeError? '<div class="banner">⚠️ '+esc(state.homeError)+'</div>' : '')+
     '<div class="home-cards single">'+
       '<div class="home-card">'+
-        '<h3>Get started</h3>'+
-        '<p>Type your username, then start a brand new session or pick up one you\'ve already begun.</p>'+
-        '<div class="field"><label>Username</label><input type="text" id="username" maxlength="40" placeholder="e.g. alex1234"></div>'+
-        '<div class="home-card-actions">'+
-          '<button class="btn btn-primary" data-action="startNew">Start a new session →</button>'+
-          '<button class="btn btn-ghost" data-action="resumeDraft">Find my drafts →</button>'+
-        '</div>'+
-        resumeMatchesHtml+
+        (signedIn
+          ? '<h3>Hi, '+esc(window.storage.studentUsername())+'</h3>'+
+            '<p>Start a brand new session, or pick up one you\'ve already begun.</p>'+
+            '<div class="home-card-actions">'+
+              '<button class="btn btn-primary" data-action="startNew">Start a new session →</button>'+
+              (state.resumeLoading
+                ? '<span class="hint">Looking for your sessions…</span>'
+                : '<button class="btn btn-ghost" data-action="resumeDraft">Refresh my sessions</button>')+
+            '</div>'+
+            resumeMatchesHtml
+          : '<h3>Open your personal link</h3>'+
+            '<p>This builder is invite-only. Use the link from your email — it signs you in, and keeps everything you write private to you.</p>'+
+            '<p class="hint">Lost the link? Ask your coach to send it again.</p>')+
       '</div>'+
     '</div>'+
     '<div class="example-sessions">'+
@@ -1560,6 +1638,7 @@ function renderHome(){
         '<div class="resume-match-row" data-action="openExampleDraft" data-example="askOrGuess"><h4>Ask or Guess?</h4><p>6 scenarios · 2 options each</p></div>'+
       '</div>'+
     '</div>'+
+    (signedIn? '<a class="home-footer-link" data-action="studentSignOut">Not '+esc(window.storage.studentUsername())+'? Sign out</a>' : '')+
     '<a class="home-footer-link" data-action="goInbox">I\'m a coach — open the review inbox →</a>'+
   '</div>';
 }
@@ -2807,9 +2886,8 @@ function handleClick(e){
   var action = t.getAttribute('data-action');
 
   if(action==='startNew'){
-    var nameEl = document.getElementById('username');
-    var name = nameEl ? nameEl.value.trim() : '';
-    if(!name){ state.homeError='Type a username to get started.'; render(); return; }
+    var name = window.storage.studentUsername();
+    if(!name){ state.homeError='Open your personal link to start a session.'; render(); return; }
     state.draft = newDraft(name);
     state.notes = [];
     state.homeError='';
@@ -2822,19 +2900,15 @@ function handleClick(e){
     }
     return;
   }
-  if(action==='resumeDraft'){
-    var nameEl2 = document.getElementById('username');
-    var uname = nameEl2 ? nameEl2.value.trim() : '';
-    if(!uname){ state.homeError='Type your username.'; state.resumeMatches=[]; render(); return; }
-    if(!hasStorage){ state.homeError='Saving isn\'t available in this preview, so drafts can\'t be resumed.'; render(); return; }
-    listDraftsForUser(uname).then(function(matches){
-      if(!matches.length){ state.homeError='No sessions found for that username. Check the spelling, or start a new one.'; state.resumeMatches=[]; render(); return; }
-      state.homeError=''; state.resumeMatches=matches; render();
-    }).catch(function(e){
-      console.error('draft lookup failed', e);
-      state.homeError='Couldn\'t reach storage to look up your drafts. Your work is safe — try again in a moment.';
-      state.resumeMatches=[]; render();
-    });
+  if(action==='resumeDraft'){ refreshMyDrafts(); return; }
+  if(action==='studentSignOut'){
+    window.storage.studentSignOut();
+    // Drop ?s= too, or the next reload would silently sign them straight back in.
+    try {
+      if(window.history && window.history.replaceState) window.history.replaceState(null, '', window.location.pathname);
+    } catch(e){ /* nothing to do; the token is cleared either way */ }
+    state.draft=null; state.notes=[]; state.resumeMatches=[]; state.homeError='';
+    state.screen='home'; render();
     return;
   }
   if(action==='openResumeDraft'){
@@ -2896,7 +2970,7 @@ function handleClick(e){
     enterDraft(exampleDraft, 'storyboard');
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); return; }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
   if(action==='goInbox'){
     if(!window.storage.hasCoachToken()){
       state.screen='coachLogin'; state.coachAuthError=''; state.coachAuthBusy=false; render(); return;
@@ -3271,6 +3345,9 @@ window.addEventListener('resize', function(){
   if(changed){ renderStickyLayer(); debounceSaveNotes(); }
 });
 render();
+// Identity comes from the URL, so the drafts list can populate before the student
+// touches anything.
+refreshMyDrafts();
 })();
 </script>
 </body>
