@@ -144,6 +144,18 @@ function normalizeQuery(query) {
   return query.trim().toLowerCase();
 }
 
+// Noun Project's search badly mismatches when the query has a leading "a "/"an " —
+// verified 2026-09: "a trophy" and "a helmet" return unrelated results (vaping and
+// pet-care icons) while "trophy" and "helmet" alone return exactly correct matches.
+// This app's own icon-description placeholder ("e.g. a bike") and every worked
+// example nudge writers toward exactly that pattern, so it's the common case, not
+// an edge case. Only strips the leading article, not a general stop-word remover —
+// that's the specific, verified failure, and nothing wider was tested.
+function stripLeadingArticle(query) {
+  const stripped = query.replace(/^(a|an)\s+/i, '').trim();
+  return stripped || query; // "a" or "an" alone would otherwise search on nothing
+}
+
 module.exports = async (req, res) => {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed.' });
@@ -164,7 +176,10 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const cacheKey = CACHE_KEY_PREFIX + normalizeQuery(query);
+  // What's actually sent to Noun Project and cached under — see stripLeadingArticle's
+  // comment. The original `query` above is kept only for the empty-input check.
+  const searchTerm = stripLeadingArticle(query);
+  const cacheKey = CACHE_KEY_PREFIX + normalizeQuery(searchTerm);
   if (redis) {
     try {
       const cached = await redis.get(cacheKey);
@@ -192,7 +207,7 @@ module.exports = async (req, res) => {
     return;
   }
 
-  const requestUrl = `${NOUN_PROJECT_ENDPOINT}?query=${encodeURIComponent(query)}&limit=${RESULT_LIMIT}`;
+  const requestUrl = `${NOUN_PROJECT_ENDPOINT}?query=${encodeURIComponent(searchTerm)}&limit=${RESULT_LIMIT}`;
   const authHeader = oauth.toHeader(oauth.authorize({ url: requestUrl, method: 'GET' }));
 
   let response;
