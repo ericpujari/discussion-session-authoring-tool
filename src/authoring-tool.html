@@ -375,10 +375,25 @@
   .p-refl{font-size:13.5px; font-style:italic; color:#3c3527;}
   .p-half{padding:18px 0; border-top:2px dashed var(--line);}
 
+  /* ---------- Coach editor's notes (per-field, review preview) ---------- */
+  .field-notes{margin:6px 0 4px;}
+  .field-note{background:#FBEAE7; border:1px solid #E8C3BC; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12.5px; line-height:1.5;}
+  .field-note-text{color:#7A342A;}
+  .field-note-meta{font-family:var(--font-mono); font-size:10.5px; color:#9B6459; margin-top:4px;}
+  .field-note-done{display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;}
+  .field-note-add-btn{font-size:11.5px; font-weight:600; color:var(--lane-a); background:none; border:none; padding:2px 0; cursor:pointer; margin-bottom:6px;}
+  .field-note-add-btn:hover{text-decoration:underline;}
+  .field-note-compose{background:#fff; border:1.5px solid var(--line); border-radius:9px; padding:10px; margin-bottom:8px;}
+  .field-note-compose-label{font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#9B8F6E; margin-bottom:6px;}
+  .field-note-compose textarea{width:100%; min-height:60px; border:none; font-family:var(--font-body); font-size:13px; resize:vertical;}
+  .field-note-compose textarea:focus{outline:none;}
+  .field-note-compose-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:6px;}
+
   .review-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:6px;}
   .status-badge{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:5px 11px; border-radius:999px; font-weight:600;}
   .status-draft{background:var(--lane-b-soft); color:#403A6E;}
   .status-submitted{background:var(--lane-c-soft); color:#7A5A16;}
+  .status-revision{background:var(--lane-d-soft); color:#7A3C54;}
   .status-reviewed{background:var(--lane-a-soft); color:#1E5B56;}
   .status-flagged{background:#F5D4CF; color:#8A241A;}
 
@@ -502,6 +517,28 @@
     flex:1; width:100%; resize:none; overflow-y:auto; border:none; background:transparent;
     font-size:13px; font-family:inherit; color:#3c3527;
   }
+
+  /* ---------- Coach editor's notes (student-facing) ----------
+     Deliberately not a sticky note: an arrow-shaped callout pointing back at the field
+     it's about, red/coral so it reads as "an adult marked this up" rather than the
+     student's own yellow/pink/blue/green/purple stickies. Draggable, but no delete and
+     no recolor — only a coach clears it, from the review page. */
+  .editor-note{
+    position:fixed; width:200px; background:#FCEBE7; border:1.5px solid #E3A99D;
+    border-radius:10px; box-shadow:var(--shadow-sm); padding:10px 26px 10px 14px;
+  }
+  .editor-note::before{
+    content:''; position:absolute; left:-9px; top:16px; width:0; height:0;
+    border-top:8px solid transparent; border-bottom:8px solid transparent; border-right:9px solid #E3A99D;
+  }
+  .editor-note::after{
+    content:''; position:absolute; left:-7px; top:16px; width:0; height:0;
+    border-top:7px solid transparent; border-bottom:7px solid transparent; border-right:8px solid #FCEBE7;
+  }
+  .editor-note-drag{position:absolute; top:6px; right:6px; color:#C98A7B; cursor:grab; padding:2px;}
+  .editor-note-drag:active{cursor:grabbing;}
+  .editor-note-text{font-size:12.5px; line-height:1.5; color:#7A342A; white-space:pre-wrap; word-break:break-word;}
+  .editor-note-byline{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#B9807A; margin-top:6px;}
 
   /* ---------- Coach inbox ---------- */
   .inbox-group{margin-bottom:26px;}
@@ -882,7 +919,9 @@ var state = {
   iconEmbedError: '',
   submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
   feedbackSending: false, feedbackSent: false, feedbackError: '',  // beta-test feedback tool — see FEEDBACK_ENABLED
-  inboxFeedbackList: [], inboxFeedbackLoading: false, inboxFeedbackError: ''
+  inboxFeedbackList: [], inboxFeedbackLoading: false, inboxFeedbackError: '',
+  composingNoteField: null,  // coach review only: field key whose "+ Note" compose box is open
+  editorNoteBusy: false      // coach review only: a note save/resolve round-trip is in flight
 };
 
 var REDIRECT_MESSAGE_1 = "This assistant is here to help you build your own Discussion Session for Synthesis — things like scenario setups, options, and questions other students will discuss. Let's focus on that. What part of your session would you like help with?";
@@ -988,6 +1027,7 @@ function newDraft(name){
     reflection:{question:'', options:['',''], reflection:''},
     aiChat: [],
     coachNotes: [],
+    editorNotes: [],
     coachMessage: ''
   };
   for(var i=0;i<6;i++) d.scenarios.push(newScenario.call(null));
@@ -1255,6 +1295,7 @@ function buildExampleDraft(key){
     reflection: {question:src.reflection.question, options:src.reflection.options.slice(), reflection:src.reflection.reflection},
     aiChat: [],
     coachNotes: [],
+    editorNotes: [],
     coachMessage: ''
   };
   return d;
@@ -1293,6 +1334,89 @@ function currentAttachForScreen(){
   if(state.screen==='halftimeEditor') return {type:'halftime'};
   if(state.screen==='reflection') return {type:'reflection'};
   return {type:'storyboard'}; // 'review' has no dedicated space; falls back to general
+}
+
+/* ---------- Coach editor's notes (shared, student-visible until resolved) ----------
+   Unlike the private stickies above, these live inside the draft record itself, so a
+   coach can write one and a student sees it on their next visit. Fields are keyed by
+   scenario/option ID rather than array index — scenarios and options get reordered
+   (moveScenario, drag/drop), and an index-keyed note would silently drift onto the
+   wrong one. See parseFieldKey for the key grammar. */
+function newEditorNote(field, text){
+  return {id:uid(), field:field, text:text||'', at:Date.now(), resolvedAt:null, x:null, y:null};
+}
+function patchEditorNote(n){
+  if(typeof n.id !== 'string' || !n.id) n.id = uid();
+  if(typeof n.field !== 'string') n.field = '';
+  if(typeof n.text !== 'string') n.text = '';
+  if(typeof n.at !== 'number') n.at = Date.now();
+  if(typeof n.resolvedAt !== 'number') n.resolvedAt = null;
+  if(typeof n.x !== 'number') n.x = null;
+  if(typeof n.y !== 'number') n.y = null;
+  return n;
+}
+// Key grammar: 'title' | 'bigIdea' | 'sc:<scenarioId>:title|setup|challenge' |
+// 'sc:<scenarioId>:opt:<optionId>:label|rationale|icon' |
+// 'halftime:question|options|reflection' | 'reflection:question|options|reflection'
+function parseFieldKey(key){
+  if(key==='title' || key==='bigIdea') return {kind:'setup', sub:key};
+  if(key.indexOf('halftime:')===0) return {kind:'halftime', sub:key.slice(9)};
+  if(key.indexOf('reflection:')===0) return {kind:'reflection', sub:key.slice(11)};
+  if(key.indexOf('sc:')===0){
+    var parts = key.slice(3).split(':');
+    if(parts[1]==='opt') return {kind:'scenarioOption', scenarioId:parts[0], optionId:parts[2], sub:parts[3]};
+    return {kind:'scenario', scenarioId:parts[0], sub:parts[1]};
+  }
+  return {kind:'unknown', sub:key};
+}
+function scenarioIndexById(d, scenarioId){
+  for(var i=0;i<d.scenarios.length;i++){ if(d.scenarios[i].id===scenarioId) return i; }
+  return -1;
+}
+function optionIndexById(sc, optionId){
+  for(var i=0;i<sc.options.length;i++){ if(sc.options[i].id===optionId) return i; }
+  return -1;
+}
+// Which student screen a note belongs on, so the editor-note layer knows when to show it.
+// Returns null if the scenario it was attached to no longer exists (shouldn't happen —
+// scenarios are never deleted — but keeps a stray note from throwing instead of hiding).
+function screenForFieldKey(key, d){
+  var p = parseFieldKey(key);
+  if(p.kind==='setup') return {screen:'setup'};
+  if(p.kind==='halftime') return {screen:'halftimeEditor'};
+  if(p.kind==='reflection') return {screen:'reflection'};
+  if(p.kind==='scenario' || p.kind==='scenarioOption'){
+    var idx = scenarioIndexById(d, p.scenarioId);
+    if(idx===-1) return null;
+    return {screen:'scenario', scenarioIndex:idx};
+  }
+  return null;
+}
+// Human label for the coach's own view — "Scenario 2 · Option B — why", etc.
+function fieldNoteLabel(key, d){
+  var p = parseFieldKey(key);
+  if(p.kind==='setup') return p.sub==='title' ? 'Thoughts for a title' : 'Overall idea';
+  if(p.kind==='halftime'){
+    return 'Halftime — '+(p.sub==='question'?'Question':(p.sub==='options'?'Options':'Forward-looking line'));
+  }
+  if(p.kind==='reflection'){
+    return 'Closing reflection — '+(p.sub==='question'?'Question':(p.sub==='options'?'Options':'Closing line'));
+  }
+  if(p.kind==='scenario' || p.kind==='scenarioOption'){
+    var idx = scenarioIndexById(d, p.scenarioId);
+    var scenarioLabel = 'Scenario '+(idx===-1? '?' : (idx+1));
+    if(p.kind==='scenario'){
+      return scenarioLabel+' — '+(p.sub==='title'?'Title':(p.sub==='setup'?'Setup':'Challenge questions'));
+    }
+    var sc = idx===-1 ? null : d.scenarios[idx];
+    var oi = sc ? optionIndexById(sc, p.optionId) : -1;
+    var optLabel = 'Option '+(oi===-1? '?' : (oi+1));
+    return scenarioLabel+' · '+optLabel+' — '+(p.sub==='label'?'Label':(p.sub==='rationale'?'Why':'Icon idea'));
+  }
+  return 'Note';
+}
+function openNotesFor(d, key){
+  return d.editorNotes.filter(function(n){ return n.field===key && !n.resolvedAt; });
 }
 
 /* ============================= STORAGE ============================= */
@@ -1413,6 +1537,8 @@ function patchLegacyDraft(d){
   }
   if(!Array.isArray(d.coachNotes)) d.coachNotes = [];
   d.coachNotes = d.coachNotes.filter(function(n){ return n && typeof n.text === 'string'; });
+  if(!Array.isArray(d.editorNotes)) d.editorNotes = [];
+  d.editorNotes = d.editorNotes.filter(function(n){ return n && typeof n.field === 'string' && typeof n.text === 'string'; }).map(patchEditorNote);
   if(!Array.isArray(d.aiChat)) d.aiChat = [];
   if(typeof d.coachMessage !== 'string') d.coachMessage = '';
   d.halftime = patchCheckinBlock(d.halftime);
@@ -1526,6 +1652,7 @@ function ensureExampleDraftsSeeded(){
       var merged = Object.assign({}, fresh, {
         status: old.status || 'submitted',
         coachNotes: old.coachNotes || [],
+        editorNotes: old.editorNotes || [],
         coachMessage: old.coachMessage || '',
         createdAt: old.createdAt || fresh.createdAt,
         updatedAt: old.updatedAt || fresh.updatedAt
@@ -1634,6 +1761,7 @@ function render(){
   if(state.screen!=='home' && state.screen!=='coachLogin' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='inboxFeedback' && state.screen!=='playerPreview' && state.screen!=='feedback' && state.draft){
     if(AI_ASSISTANT_ENABLED) renderCoachOverlay();
     renderStickyLayer();
+    renderEditorNoteLayer();
   }
 }
 
@@ -2182,40 +2310,102 @@ function renderPlayerPreview(){
 }
 
 /* ---------- Review ---------- */
-function renderReviewPreview(d){
+// Renders the open (unresolved) editor's notes for one field, plus — for the coach only —
+// the "+ Note" control that adds a new one. `d.id` doubles as the data-id every note
+// action needs to know which draft to write back to.
+function noteBlockHtml(d, fieldKey, opts){
+  var isCoach = !!(opts && opts.coachNotes);
+  var open = openNotesFor(d, fieldKey);
+  var notesHtml = open.map(function(n){
+    return '<div class="field-note">'+
+      '<div class="field-note-text">'+esc(n.text)+'</div>'+
+      '<div class="field-note-meta">'+
+        (isCoach
+          ? '<label class="field-note-done"><input type="checkbox" data-action="toggleNoteResolved" data-id="'+esc(d.id)+'" data-noteid="'+esc(n.id)+'"'+(state.editorNoteBusy?' disabled':'')+'> Mark done</label>'
+          : (timeAgo(n.at)+' · from your coach')
+        )+
+      '</div>'+
+    '</div>';
+  }).join('');
+  if(!isCoach) return notesHtml ? '<div class="field-notes">'+notesHtml+'</div>' : '';
+
+  var controlHtml = state.composingNoteField===fieldKey
+    ? '<div class="field-note-compose">'+
+        '<div class="field-note-compose-label">Note on: '+esc(fieldNoteLabel(fieldKey, d))+'</div>'+
+        '<textarea id="fieldNoteComposeInput" maxlength="500" placeholder="What should they change here?"></textarea>'+
+        '<div class="field-note-compose-actions">'+
+          '<button type="button" class="btn btn-ghost btn-small" data-action="cancelFieldNote">Cancel</button>'+
+          '<button type="button" class="btn btn-primary btn-small" data-action="saveFieldNote" data-id="'+esc(d.id)+'" data-field="'+esc(fieldKey)+'"'+(state.editorNoteBusy?' disabled':'')+'>Save note</button>'+
+        '</div>'+
+      '</div>'
+    : '<button type="button" class="field-note-add-btn" data-action="addFieldNote" data-field="'+esc(fieldKey)+'">+ Note</button>';
+
+  return '<div class="field-notes">'+notesHtml+controlHtml+'</div>';
+}
+function renderReviewPreview(d, opts){
   var scenarioBlocks = d.scenarios.map(function(sc,i){
-    var opts = sc.options.map(function(o,oi){
+    var optsHtml = sc.options.map(function(o,oi){
       var lane = LANES[o.colorIndex];
       var iconHtml = o.selectedIcon
         ? '<img src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'
         : ICON_PLACEHOLDER_SVG;
-      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b><span>'+esc(o.rationale)+'</span>'+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+'</div></div>';
+      var optKeyBase = 'sc:'+sc.id+':opt:'+o.id+':';
+      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b>'+noteBlockHtml(d, optKeyBase+'label', opts)+'<span>'+esc(o.rationale)+'</span>'+noteBlockHtml(d, optKeyBase+'rationale', opts)+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+noteBlockHtml(d, optKeyBase+'icon', opts)+'</div></div>';
     }).join('');
     var cqs = sc.challenge.filter(function(q){return q.trim();}).map(function(q){return '<div>'+esc(q)+'</div>';}).join('');
     var block = '<div class="p-scenario"><h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">🖥️ Preview</span></h4>'+
+      noteBlockHtml(d, 'sc:'+sc.id+':title', opts)+
       '<div class="p-setup">'+esc(sc.setup)+'</div>'+
-      '<div class="p-opts">'+opts+'</div>'+
+      noteBlockHtml(d, 'sc:'+sc.id+':setup', opts)+
+      '<div class="p-opts">'+optsHtml+'</div>'+
       (cqs? '<div class="p-q-label">Challenge questions</div><div class="p-cqs">'+cqs+'</div>' : '')+
+      noteBlockHtml(d, 'sc:'+sc.id+':challenge', opts)+
       (sc.reflection? '<div class="p-q-label">Reflection question</div><div class="p-refl">'+esc(sc.reflection)+'</div>' : '')+
     '</div>';
     return block;
   });
   var half = d.halftime, refl = d.reflection;
-  var halftimeBlock = '<div class="p-half"><h4>Halftime</h4><div class="p-setup">'+esc(half.question)+'</div><div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+(half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>':'')+'</div>';
-  var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4><div class="p-setup">'+esc(refl.question)+'</div><div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+(refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>':'')+'</div>';
+  var halftimeBlock = '<div class="p-half"><h4>Halftime</h4><div class="p-setup">'+esc(half.question)+'</div>'+
+    noteBlockHtml(d, 'halftime:question', opts)+
+    '<div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+
+    noteBlockHtml(d, 'halftime:options', opts)+
+    (half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>':'')+
+    noteBlockHtml(d, 'halftime:reflection', opts)+
+  '</div>';
+  var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4><div class="p-setup">'+esc(refl.question)+'</div>'+
+    noteBlockHtml(d, 'reflection:question', opts)+
+    '<div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+
+    noteBlockHtml(d, 'reflection:options', opts)+
+    (refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>':'')+
+    noteBlockHtml(d, 'reflection:reflection', opts)+
+  '</div>';
 
-  var ideaBlock = d.bigIdea ? ('<div class="p-blurb p-internal"><span class="p-q-label" style="margin:0 0 4px;">Overall idea — notes for you and your coach, not part of the session</span><br>'+esc(d.bigIdea)+'</div>') : '';
+  var ideaBlock = d.bigIdea ? ('<div class="p-blurb p-internal"><span class="p-q-label" style="margin:0 0 4px;">Overall idea — notes for you and your coach, not part of the session</span><br>'+esc(d.bigIdea)+noteBlockHtml(d, 'bigIdea', opts)+'</div>') : '';
 
   return ''+
   '<div class="print-card">'+
     '<div class="p-eyebrow">SYNTHESIS DISCUSSION SESSION</div>'+
     '<h2 class="p-title">'+esc(d.title||'Untitled Session')+'</h2>'+
+    noteBlockHtml(d, 'title', opts)+
     ideaBlock+
     scenarioBlocks.slice(0,3).join('')+
     halftimeBlock+
     scenarioBlocks.slice(3).join('')+
     reflectionBlock+
   '</div>';
+}
+// Single source of truth for the status badge — three call sites (student review, inbox
+// row, coach review) used to each carry their own copy of this ternary, which is how the
+// 'submitted' label ended up drifting ("Waiting for coach" vs "Waiting for review") and
+// why the fallback for an unrecognized status quietly renders as "Reviewed" everywhere.
+function statusMeta(status, audience){
+  var known = status==='draft' || status==='submitted' || status==='revision' || status==='reviewed';
+  var cls = 'status-'+(known ? status : 'reviewed');
+  var label = status==='draft' ? 'Drafting'
+    : status==='submitted' ? (audience==='student' ? 'Waiting for coach' : 'Waiting for review')
+    : status==='revision' ? (audience==='student' ? 'Sent back with notes' : 'Needs revision')
+    : 'Reviewed';
+  return {cls:cls, label:label};
 }
 function balanceStripHtml(){
   return '<div class="panel"><div class="balance-strip"><div class="bs-title"><span class="b-icon">⚖️</span>Balance self-check</div><ul>'+
@@ -2226,8 +2416,7 @@ function balanceStripHtml(){
 }
 function renderReview(){
   var d = state.draft;
-  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for coach':'Reviewed');
+  var sm = statusMeta(d.status, 'student'), statusCls = sm.cls, statusLabel = sm.label;
   var notes = d.coachNotes.length? (
     '<div class="panel"><h3>Notes from your coach</h3><div class="coach-notes">'+
       d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+
@@ -2259,8 +2448,7 @@ function renderReview(){
 // One row's markup — pulled out so the three priority groups below render
 // identically instead of three copies of the same template drifting apart.
 function renderInboxRow(d){
-  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
+  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.label;
   return ''+
   '<div class="inbox-row" data-action="openInboxDraft" data-id="'+esc(d.id)+'">'+
     '<div class="ir-left"><h4>'+esc(d.title||'Untitled')+' — <span style="font-weight:400;">'+esc(d.studentName)+'</span></h4><p>CODE '+esc(d.id)+' · updated '+timeAgo(d.updatedAt)+'</p></div>'+
@@ -2282,10 +2470,12 @@ function renderInboxGroup(label, list){
 }
 function renderShellInbox(){
   var submitted = state.inboxList.filter(function(d){ return d.status==='submitted'; });
+  var needsRevision = state.inboxList.filter(function(d){ return d.status==='revision'; });
   var inProgress = state.inboxList.filter(function(d){ return d.status==='draft'; });
   var reviewed = state.inboxList.filter(function(d){ return d.status==='reviewed'; });
   var rows = state.inboxList.length ? (
     renderInboxGroup('Ready for review', submitted)+
+    renderInboxGroup('Needs revision', needsRevision)+
     renderInboxGroup('In progress', inProgress)+
     renderInboxGroup('Reviewed', reviewed)
   ) : (state.inboxLoading
@@ -2387,8 +2577,7 @@ function renderShellInboxFlagged(){
 function renderShellInboxDraft(){
   var d = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
   if(!d) return renderShellInbox();
-  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
+  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.label;
   return ''+
   '<div class="home-wrap inbox-draft-wrap">'+
     '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
@@ -2396,14 +2585,14 @@ function renderShellInboxDraft(){
       '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
       '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'">⬇ Download as Markdown</button>'+
     '</div>'+
-    renderReviewPreview(d)+
+    renderReviewPreview(d, {coachNotes:true})+
     (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
     '<div class="panel">'+
       '<h3>Leave feedback for '+esc(d.studentName)+'</h3>'+
       '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass?"></textarea></div>'+
       '<div class="review-actions">'+
-        '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back for revisions</button>'+
+        '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back with notes</button>'+
         '<button class="btn btn-primary" data-action="markReviewed" data-id="'+esc(d.id)+'">Mark reviewed ✅</button>'+
         // The two seeded examples are reference material, not a student's own work —
         // keep them out of reach here rather than let a stray click remove them.
@@ -2664,6 +2853,115 @@ function startNoteDrag(e, note){
 }
 function removeNotesOverlay(){
   var existing = document.getElementById('notesOverlayRoot');
+  if(existing) existing.remove();
+}
+
+/* ---------- Coach editor's notes, student-facing overlay ----------
+   Same idea as the sticky-note dock above, but the notes come from the coach (stored on
+   the draft, see newEditorNote) and are read-only, draggable-only — no delete, no color.
+   A separate #editorNotesOverlayRoot so this never fights with renderStickyLayer's full
+   innerHTML replacement of #notesOverlayRoot. */
+var EDITOR_NOTE_W = 200, EDITOR_NOTE_H = 120;
+var editorNoteZCounter = 46;
+function editorNotesForScreen(d){
+  if(!d) return [];
+  return (d.editorNotes||[]).filter(function(n){
+    if(n.resolvedAt) return false;
+    var loc = screenForFieldKey(n.field, d);
+    if(!loc || loc.screen !== state.screen) return false;
+    if(loc.screen==='scenario' && loc.scenarioIndex !== state.scenarioIndex) return false;
+    return true;
+  });
+}
+// Finds the DOM field a note is attached to, so a freshly-arrived note can drop in next
+// to the thing it's actually about instead of a generic corner of the screen.
+function editorNoteAnchorEl(n, d){
+  var p = parseFieldKey(n.field);
+  var sel = null;
+  if(p.kind==='setup') sel = '[data-bind="'+(p.sub==='title'?'title':'bigIdea')+'"]';
+  else if(p.kind==='halftime') sel = '[data-bind="'+(p.sub==='question'?'halftimeQ':(p.sub==='options'?'halftimeOpt':'halftimeRefl'))+'"]';
+  else if(p.kind==='reflection') sel = '[data-bind="'+(p.sub==='question'?'reflectionQ':(p.sub==='options'?'reflectionOpt':'reflectionRefl'))+'"]';
+  else if(p.kind==='scenario') sel = '[data-bind="'+(p.sub==='title'?'scTitle':(p.sub==='setup'?'scSetup':'challenge'))+'"]';
+  else if(p.kind==='scenarioOption'){
+    var idx = scenarioIndexById(d, p.scenarioId);
+    var sc = idx===-1 ? null : d.scenarios[idx];
+    var oi = sc ? optionIndexById(sc, p.optionId) : -1;
+    if(oi===-1) return null;
+    var bindName = p.sub==='label' ? 'option.label' : (p.sub==='rationale' ? 'option.rationale' : 'option.iconDescription');
+    sel = '[data-bind="'+bindName+'"][data-oidx="'+oi+'"]';
+  }
+  return sel ? document.querySelector(sel) : null;
+}
+function placeEditorNoteIfNeeded(n, d){
+  if(n.x!=null && n.y!=null) return;
+  var el = editorNoteAnchorEl(n, d);
+  var x, y;
+  if(el){
+    var r = el.getBoundingClientRect();
+    x = r.right + 16; y = r.top;
+  } else {
+    x = window.innerWidth - EDITOR_NOTE_W - 24; y = 120;
+  }
+  n.x = clamp(x, 0, window.innerWidth-EDITOR_NOTE_W);
+  n.y = clamp(y, 0, window.innerHeight-EDITOR_NOTE_H);
+  n.z = ++editorNoteZCounter;
+  debounceSave();
+}
+function renderEditorNote(n){
+  return ''+
+  '<div class="editor-note" data-editornoteid="'+n.id+'" style="left:'+n.x+'px; top:'+n.y+'px; z-index:'+(n.z||editorNoteZCounter)+'">'+
+    '<div class="editor-note-drag" data-drag-editornote="'+n.id+'" title="Drag to move">'+DRAG_HANDLE_SVG+'</div>'+
+    '<div class="editor-note-text">'+esc(n.text)+'</div>'+
+    '<div class="editor-note-byline">— Your coach</div>'+
+  '</div>';
+}
+function renderEditorNoteLayer(){
+  var d = state.draft;
+  var notes = editorNotesForScreen(d);
+  notes.forEach(function(n){ placeEditorNoteIfNeeded(n, d); });
+  var html = notes.map(renderEditorNote).join('');
+  var wrap = document.getElementById('editorNotesOverlayRoot');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'editorNotesOverlayRoot';
+    document.body.appendChild(wrap);
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-drag-editornote]').forEach(function(handle){
+    handle.addEventListener('pointerdown', function(e){
+      var note = notes.filter(function(n){ return n.id===handle.getAttribute('data-drag-editornote'); })[0];
+      if(note) startEditorNoteDrag(e, note);
+    });
+  });
+}
+// Deliberately simpler than startNoteDrag: no trash target (students can't delete these),
+// no handle-occlusion pass (a coach rarely leaves more than one open note per field), and
+// it commits through the normal draft autosave since editorNotes lives on the draft record
+// itself rather than the separate private-notes store.
+function startEditorNoteDrag(e, note){
+  e.preventDefault();
+  note.z = ++editorNoteZCounter;
+  var startX = e.clientX, startY = e.clientY, origX = note.x, origY = note.y;
+  var el = document.querySelector('.editor-note[data-editornoteid="'+note.id+'"]');
+  if(el) el.style.zIndex = note.z;
+  function onMove(ev){
+    note.x = clamp(origX + (ev.clientX-startX), 0, window.innerWidth-EDITOR_NOTE_W);
+    note.y = clamp(origY + (ev.clientY-startY), 0, window.innerHeight-EDITOR_NOTE_H);
+    if(el){ el.style.left = note.x+'px'; el.style.top = note.y+'px'; }
+  }
+  function onUp(ev){
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    debounceSave();
+  }
+  function onCancel(ev){ onUp(ev); }
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
+}
+function removeEditorNotesOverlay(){
+  var existing = document.getElementById('editorNotesOverlayRoot');
   if(existing) existing.remove();
 }
 
@@ -3142,7 +3440,7 @@ function handleClick(e){
     enterDraft(exampleDraft, 'storyboard');
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; state.feedbackSent=false; state.feedbackError=''; state.feedbackSending=false; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; state.feedbackSent=false; state.feedbackError=''; state.feedbackSending=false; removeNotesOverlay(); removeEditorNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
   if(action==='openFeedback'){ state.feedbackSent=false; state.feedbackError=''; state.screen='feedback'; render(); return; }
   if(action==='submitFeedback'){
     var likesEl = document.getElementById('feedbackLikes');
@@ -3287,7 +3585,7 @@ function handleClick(e){
         return;
       }
       if(text) d.coachNotes.push({text:text, at:Date.now()});
-      d.status = action==='markReviewed' ? 'reviewed' : 'draft';
+      d.status = action==='markReviewed' ? 'reviewed' : 'revision';
       d.updatedAt = Date.now();
       return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
         return listAllDrafts();
@@ -3301,6 +3599,91 @@ function handleClick(e){
       if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
       state.inboxError='Couldn\'t save that change — it may not have gone through. Try again in a moment.';
       state.screen='inbox';
+      render();
+    });
+    return;
+  }
+
+  // Per-field editor's notes — see noteBlockHtml. Unlike send-back/mark-reviewed, these
+  // stay on the same draft's review page rather than returning to the inbox list, so a
+  // coach can add several notes in one pass.
+  if(action==='addFieldNote'){
+    state.composingNoteField = t.getAttribute('data-field');
+    render();
+    var composeEl = document.getElementById('fieldNoteComposeInput');
+    if(composeEl) composeEl.focus();
+    return;
+  }
+  if(action==='cancelFieldNote'){
+    state.composingNoteField = null;
+    render();
+    return;
+  }
+  if(action==='saveFieldNote'){
+    var noteField = t.getAttribute('data-field');
+    var noteDraftId = t.getAttribute('data-id');
+    var composeInput = document.getElementById('fieldNoteComposeInput');
+    var noteText = composeInput ? composeInput.value.trim() : '';
+    if(!noteText){ state.composingNoteField = null; render(); return; }
+    state.editorNoteBusy = true;
+    render();
+    loadDraft(noteDraftId).then(function(d){
+      if(!d){
+        state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
+        state.editorNoteBusy = false;
+        state.composingNoteField = null;
+        state.screen = 'inbox';
+        render();
+        return;
+      }
+      d.editorNotes.push(newEditorNote(noteField, noteText));
+      d.updatedAt = Date.now();
+      return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+        return listAllDrafts();
+      }).then(function(list){
+        state.inboxList = list;
+        state.composingNoteField = null;
+        state.editorNoteBusy = false;
+        render();
+      });
+    }).catch(function(e){
+      console.error('save field note failed', e);
+      state.editorNoteBusy = false;
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = 'Couldn\'t save that note — it may not have gone through. Try again in a moment.';
+      render();
+    });
+    return;
+  }
+  if(action==='toggleNoteResolved'){
+    var resolveDraftId = t.getAttribute('data-id');
+    var resolveNoteId = t.getAttribute('data-noteid');
+    var resolveChecked = t.checked;
+    state.editorNoteBusy = true;
+    render();
+    loadDraft(resolveDraftId).then(function(d){
+      if(!d){
+        state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
+        state.editorNoteBusy = false;
+        state.screen = 'inbox';
+        render();
+        return;
+      }
+      var note = d.editorNotes.filter(function(n){ return n.id===resolveNoteId; })[0];
+      if(note) note.resolvedAt = resolveChecked ? Date.now() : null;
+      d.updatedAt = Date.now();
+      return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+        return listAllDrafts();
+      }).then(function(list){
+        state.inboxList = list;
+        state.editorNoteBusy = false;
+        render();
+      });
+    }).catch(function(e){
+      console.error('toggle note resolved failed', e);
+      state.editorNoteBusy = false;
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = 'Couldn\'t update that note — it may not have gone through. Try again in a moment.';
       render();
     });
     return;
@@ -3584,15 +3967,26 @@ window.addEventListener('resize', function(){
   // no notes are on screen, or the next render clamps against stale bounds. On iOS
   // this also fires when the URL bar collapses, which is what kept notes jumping.
   syncStickySize();
-  if(!document.getElementById('notesOverlayRoot')) return;
-  var changed = false;
-  state.notes.forEach(function(n){
-    if(n.x==null || n.y==null) return;
-    var nx = clamp(n.x, 0, window.innerWidth-STICKY_W);
-    var ny = clamp(n.y, 0, window.innerHeight-STICKY_H);
-    if(nx!==n.x || ny!==n.y){ n.x=nx; n.y=ny; changed=true; }
-  });
-  if(changed){ renderStickyLayer(); debounceSaveNotes(); }
+  if(document.getElementById('notesOverlayRoot')){
+    var changed = false;
+    state.notes.forEach(function(n){
+      if(n.x==null || n.y==null) return;
+      var nx = clamp(n.x, 0, window.innerWidth-STICKY_W);
+      var ny = clamp(n.y, 0, window.innerHeight-STICKY_H);
+      if(nx!==n.x || ny!==n.y){ n.x=nx; n.y=ny; changed=true; }
+    });
+    if(changed){ renderStickyLayer(); debounceSaveNotes(); }
+  }
+  if(document.getElementById('editorNotesOverlayRoot') && state.draft){
+    var editorChanged = false;
+    (state.draft.editorNotes||[]).forEach(function(n){
+      if(n.x==null || n.y==null) return;
+      var ex = clamp(n.x, 0, window.innerWidth-EDITOR_NOTE_W);
+      var ey = clamp(n.y, 0, window.innerHeight-EDITOR_NOTE_H);
+      if(ex!==n.x || ey!==n.y){ n.x=ex; n.y=ey; editorChanged=true; }
+    });
+    if(editorChanged){ renderEditorNoteLayer(); debounceSave(); }
+  }
 });
 render();
 // Identity comes from the URL, so the drafts list can populate before the student
