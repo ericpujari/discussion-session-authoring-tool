@@ -113,7 +113,7 @@
   .home-cards{display:grid; grid-template-columns:1fr 1fr; gap:20px;}
   @media (max-width:720px){.home-cards{grid-template-columns:1fr;}}
   .home-cards.single{display:flex; justify-content:center;}
-  .home-cards.single .home-card{max-width:460px; width:100%;}
+  .home-cards.single .home-card{max-width:clamp(460px, 55vw, 780px); width:100%;}
   .home-card{
     background:var(--paper); border-radius:var(--radius); padding:28px; box-shadow:var(--shadow);
     border-top:6px solid var(--lane-a);
@@ -144,14 +144,14 @@
   .resume-match-actions{display:flex; gap:6px; flex-shrink:0;}
   .resume-match-actions .btn-icon{width:28px; height:28px; font-size:13px;}
   .feedback-callout{
-    max-width:460px; margin:20px auto 0; background:var(--lane-c-soft); border:1.5px solid var(--lane-c-line);
+    max-width:clamp(460px, 55vw, 780px); margin:20px auto 0; background:var(--lane-c-soft); border:1.5px solid var(--lane-c-line);
     border-radius:var(--radius); padding:26px 24px; text-align:center; box-shadow:var(--shadow);
   }
   .feedback-callout h3{color:var(--ink); font-size:20px; margin-bottom:8px;}
   .feedback-callout p{color:var(--ink-soft); font-size:14px; margin:0 0 18px; line-height:1.5;}
   .feedback-callout .btn-primary{background:var(--lane-c); color:#fff;}
   .feedback-callout .btn-primary:hover{background:#9c6519;}
-  .example-sessions{max-width:460px; margin:30px auto 0; text-align:center;}
+  .example-sessions{max-width:clamp(460px, 55vw, 780px); margin:30px auto 0; text-align:center;}
   .example-sessions h3{color:#fff; font-size:15px; margin-bottom:4px;}
   .example-sessions p{color:#93A2B3; font-size:13px; margin-bottom:14px;}
   .example-sessions .resume-matches{margin-top:0; text-align:left;}
@@ -427,6 +427,7 @@
   .status-revision{background:var(--lane-d-soft); color:#7A3C54;}
   .status-reviewed{background:var(--lane-a-soft); color:#1E5B56;}
   .status-accepted{background:var(--lane-a-soft); color:#1E5B56;}
+  .status-ready{background:var(--lane-b-soft); color:#403A6E;}
   .status-flagged{background:#F5D4CF; color:#8A241A;}
 
   .accept-banner{display:flex; gap:14px; align-items:flex-start; background:var(--lane-a-soft); border:1.5px solid var(--lane-a-line);}
@@ -578,6 +579,20 @@
   .editor-note-byline{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#B9807A; margin-top:6px;}
 
   /* ---------- Coach inbox ---------- */
+  .inbox-filter-bar{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:rgba(255,255,255,.06);
+    border-radius:12px; padding:10px 14px; margin-bottom:22px;
+  }
+  .inbox-filter-bar input[type="text"]{
+    flex:1; min-width:200px; padding:9px 12px; border-radius:8px; border:1.5px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.94); color:var(--ink); font-family:inherit; font-size:13.5px;
+  }
+  .inbox-filter-bar input[type="date"]{
+    padding:8px 10px; border-radius:8px; border:1.5px solid rgba(255,255,255,.16);
+    background:rgba(255,255,255,.94); color:var(--ink); font-family:inherit; font-size:13px;
+  }
+  .inbox-filter-date-label{display:flex; align-items:center; gap:8px; color:#C7D2DD; font-size:12.5px; font-weight:600;}
+  .inbox-filter-sep{color:#7C8CA0;}
   .inbox-group{margin-bottom:26px;}
   .inbox-group:last-child{margin-bottom:0;}
   .inbox-row{
@@ -962,7 +977,8 @@ var state = {
   editorNoteBusy: false,     // coach review only: a note save/resolve round-trip is in flight
   pendingList: [],           // coach inbox only: accepted sessions being polished, or already shipped
   pendingSelectedId: null,
-  pendingDraft: null         // the pending record currently open on the polish screen
+  pendingDraft: null,        // the pending record currently open on the polish screen
+  inboxSearch: '', inboxDateFrom: '', inboxDateTo: ''  // coach inbox search/filter — see matchesInboxFilter
 };
 
 var REDIRECT_MESSAGE_1 = "This assistant is here to help you build your own Discussion Session for Synthesis — things like scenario setups, options, and questions other students will discuss. Let's focus on that. What part of your session would you like help with?";
@@ -1060,7 +1076,7 @@ function newDraft(name){
     id: genCode(),
     studentName: name || 'Student',
     createdAt: Date.now(), updatedAt: Date.now(),
-    status: 'draft',
+    status: 'draft', submittedAt: null,
     title:'', bigIdea:'',
     optionCount: 3,
     scenarios: [],
@@ -1088,7 +1104,7 @@ function newDraft(name){
 var EXAMPLE_SESSIONS = {
   heartMindGut: {
     title: "Heart, Mind, or Gut?",
-    bigIdea: "When making a big decision, where do you turn? Your gut, which reads a situation before you can explain why? Your heart, which knows what you love? Or your mind, which weighs the facts? Every day — with friends, at school, on teams — we lean on all three voices, sometimes without even realizing it. This week, students explore six scenarios that put gut, heart, and mind in competition with each other.",
+    bigIdea: "ok so — decisions. everyone always says \"trust your gut\" but also \"follow your heart\" and also \"think it through\"?? which one even wins. probably none of them always. want scenarios where gut/heart/mind actually give DIFFERENT answers, not just vibes-vs-logic — more like all three show up and none of them are wrong, just different. mostly friends/school/team stuff, keep it small and real not dramatic. still not sure if there's a \"right\" voice by the end or if it genuinely just depends — leaning toward it depends.",
     optionCount: 3,
     scenarios: [
       {
@@ -1201,7 +1217,7 @@ var EXAMPLE_SESSIONS = {
   },
   askOrGuess: {
     title: "Ask or Guess?",
-    bigIdea: "Some people believe if you want something, you should just ask for it directly. Others believe the people who care about you should notice what you need without being told. Neither approach is right or wrong — each one protects something different. This week, students explore six scenarios that test the line between asking and hoping to be understood.",
+    bigIdea: "thinking about ask-vs-guess culture — some families/friend groups you just SAY what you want, other places that's weird and you're supposed to pick up on hints instead. neither is wrong but they clash SO much when they mix (classic misunderstanding generator). want small everyday scenarios, not huge dramatic ones — missed invite, asking a sibling for help, teacher deadline, that kind of size. maybe end on: which one are you, and does it match your family? not 100% sure yet but leaning that way.",
     optionCount: 2,
     scenarios: [
       {
@@ -1319,7 +1335,7 @@ function buildExampleDraft(key){
     // junk in the coach inbox.
     isExample: true,
     createdAt: Date.now(), updatedAt: Date.now(),
-    status: 'draft',
+    status: 'draft', submittedAt: null,
     title: src.title, bigIdea: src.bigIdea,
     optionCount: src.optionCount,
     // Deterministic, not uid() — ensureExampleDraftsSeeded rebuilds this fresh (title,
@@ -1558,6 +1574,39 @@ function savePendingDraft(){
     setPendingSaveIndicator('failed');
   });
 }
+
+/* ---------- Coach draft-record autosave (feedback box + field-note compose) ----------
+   Both the "Leave feedback" textarea and whichever field-note compose box is open
+   autosave onto the same draft: record (coachDraftNote / noteComposeDrafts — see
+   patchLegacyDraft), so a coach's in-progress typing survives a reload before they've
+   clicked Send back / Accepted / Save note. One shared debounce per draft id: if a
+   coach is typing in both at once, either box's timer covers both fields, since both
+   mutations land on the same in-memory record before either fires. */
+var coachDraftSaveTimers = {}; // draft id -> timer
+function setCoachDraftSaveIndicator(indicatorElId, status){
+  var el = document.getElementById(indicatorElId);
+  if(!el) return;
+  el.className = 'rail-save-indicator '+status;
+  el.textContent = saveStatusText(status);
+}
+function debounceCoachNoteSave(d, indicatorElId){
+  setCoachDraftSaveIndicator(indicatorElId, 'unsaved');
+  if(coachDraftSaveTimers[d.id]) clearTimeout(coachDraftSaveTimers[d.id]);
+  coachDraftSaveTimers[d.id] = setTimeout(function(){
+    saveCoachDraftRecord(d, indicatorElId);
+  }, 600);
+}
+function saveCoachDraftRecord(d, indicatorElId){
+  if(coachDraftSaveTimers[d.id]){ clearTimeout(coachDraftSaveTimers[d.id]); delete coachDraftSaveTimers[d.id]; }
+  setCoachDraftSaveIndicator(indicatorElId, 'saving');
+  d.updatedAt = Date.now();
+  return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+    setCoachDraftSaveIndicator(indicatorElId, 'saved');
+  }).catch(function(e){
+    console.error('coach draft note autosave failed', e);
+    setCoachDraftSaveIndicator(indicatorElId, 'failed');
+  });
+}
 // Every load path funnels through here (loadDraft, listAllDrafts, listDraftsForUser),
 // so this is the one place that can guarantee the shape the render code assumes.
 // It has to be total: renderers call .trim() on title/setup/label/rationale and index
@@ -1611,6 +1660,13 @@ function patchLegacyDraft(d){
   if(typeof d.studentName !== 'string' || !d.studentName) d.studentName = 'Student';
   if(typeof d.status !== 'string') d.status = 'draft';
   if(typeof d.acceptedAt !== 'number') d.acceptedAt = null;
+  if(typeof d.submittedAt !== 'number') d.submittedAt = null;
+  // Coach-side scratch space, autosaved as-you-type but never shown to the student —
+  // see saveCoachDraftNote. coachDraftNote backs the "Leave feedback" box;
+  // noteComposeDrafts backs whichever field-note compose box is currently open,
+  // keyed by field so it survives switching between fields before hitting Save note.
+  if(typeof d.coachDraftNote !== 'string') d.coachDraftNote = '';
+  if(!d.noteComposeDrafts || typeof d.noteComposeDrafts !== 'object' || Array.isArray(d.noteComposeDrafts)) d.noteComposeDrafts = {};
   if(typeof d.createdAt !== 'number') d.createdAt = Date.now();
   if(typeof d.updatedAt !== 'number') d.updatedAt = d.createdAt;
   if(typeof d.title !== 'string') d.title = '';
@@ -1646,6 +1702,7 @@ function newPendingFromDraft(d){
     id: d.id,
     studentName: d.studentName,
     title: d.title,
+    submittedAt: d.submittedAt, // carried over so the inbox's "date submitted" filter still means the original submission once this has moved past 'pending'
     bigIdea: d.bigIdea, // carried over for the coach's own reference only — never shown to students, never exported
     parentBlurb: '',
     optionCount: d.optionCount,
@@ -1661,18 +1718,21 @@ function newPendingFromDraft(d){
     }),
     halftime: {question:d.halftime.question, options:d.halftime.options.slice(), reflection:d.halftime.reflection},
     reflection: {question:d.reflection.question, options:d.reflection.options.slice(), reflection:d.reflection.reflection},
-    status: 'pending',        // 'pending' | 'shipped'
+    status: 'pending',        // 'pending' -> 'ready' -> 'shipped'
+    readyAt: null,
     usageWeeks: [],            // ISO date strings, each meaning "the week of this date"
     sentToCodeAt: null,
     createdAt: Date.now(), updatedAt: Date.now()
   };
 }
+var PENDING_STATUSES = ['pending', 'ready', 'shipped'];
 function patchPendingRecord(p){
   if(!p || typeof p !== 'object' || Array.isArray(p)) return null;
   if(typeof p.id !== 'string' || !p.id) return null;
   if(typeof p.studentName !== 'string' || !p.studentName) p.studentName = 'Student';
   if(typeof p.title !== 'string') p.title = '';
   if(typeof p.bigIdea !== 'string') p.bigIdea = '';
+  if(typeof p.submittedAt !== 'number') p.submittedAt = null;
   if(typeof p.parentBlurb !== 'string') p.parentBlurb = '';
   if(typeof p.optionCount !== 'number' || p.optionCount < 2 || p.optionCount > LANES.length) p.optionCount = 3;
   if(!Array.isArray(p.scenarios)) p.scenarios = [];
@@ -1680,7 +1740,8 @@ function patchPendingRecord(p){
   while(p.scenarios.length < SCENARIO_COUNT) p.scenarios.push(patchScenario(null, p.optionCount));
   p.halftime = patchCheckinBlock(p.halftime);
   p.reflection = patchCheckinBlock(p.reflection);
-  if(p.status !== 'pending' && p.status !== 'shipped') p.status = 'pending';
+  if(PENDING_STATUSES.indexOf(p.status) === -1) p.status = 'pending';
+  if(typeof p.readyAt !== 'number') p.readyAt = null;
   if(!Array.isArray(p.usageWeeks)) p.usageWeeks = [];
   p.usageWeeks = p.usageWeeks.filter(function(w){ return typeof w === 'string' && w; });
   if(typeof p.sentToCodeAt !== 'number') p.sentToCodeAt = null;
@@ -1797,23 +1858,26 @@ var EXAMPLE_INBOX_IDS = {heartMindGut: 'EXAMPLE-HMG', askOrGuess: 'EXAMPLE-AOG'}
 // One "Ask or Guess?" draft frozen at each of the other stages, so the coach inbox always
 // has a worked example of the whole pipeline rather than only ever showing "Ready for
 // review" — see buildPipelineExampleDraft. EXAMPLE-AOG itself already covers submitted.
-var EXAMPLE_PIPELINE_IDS = {revision:'EXAMPLE-AOG-REV', pending:'EXAMPLE-AOG-PEND', shipped:'EXAMPLE-AOG-SHIP'};
+var EXAMPLE_PIPELINE_IDS = {revision:'EXAMPLE-AOG-REV', pending:'EXAMPLE-AOG-PEND', ready:'EXAMPLE-AOG-READY', shipped:'EXAMPLE-AOG-SHIP'};
 function isSeededExampleId(id){
   return id==='EXAMPLE-HMG' || id==='EXAMPLE-AOG' ||
-    id===EXAMPLE_PIPELINE_IDS.revision || id===EXAMPLE_PIPELINE_IDS.pending || id===EXAMPLE_PIPELINE_IDS.shipped;
+    id===EXAMPLE_PIPELINE_IDS.revision || id===EXAMPLE_PIPELINE_IDS.pending ||
+    id===EXAMPLE_PIPELINE_IDS.ready || id===EXAMPLE_PIPELINE_IDS.shipped;
 }
+var PIPELINE_STAGE_LABELS = {revision:'needs revision', pending:'pending polish', ready:'ready for code', shipped:'shipped'};
 // Builds one pipeline-stage demo from the same "Ask or Guess?" content as EXAMPLE-AOG.
 // 'revision' stops at a draft: record with a coach note and one inline editor's note
 // (on scenario 0's second option — see the deterministic ids buildExampleDraft now
 // uses, without which this note would point at a scenario id that stops existing on
-// the next reseed). 'pending' and 'shipped' mirror what acceptDraft/newPendingFromDraft
-// actually produce: a frozen, accepted draft plus its own pending:<id> record, the
-// parent blurb filled in, and — for 'shipped' — usage weeks and a ship date.
+// the next reseed). 'pending', 'ready', and 'shipped' mirror what
+// acceptDraft/newPendingFromDraft/markPendingReady/markSentToCode actually produce: a
+// frozen, accepted draft plus its own pending:<id> record, the parent blurb filled in,
+// and — once 'ready' or past it — usage weeks and a ship date once truly shipped.
 function buildPipelineExampleDraft(stage){
   var d = buildExampleDraft('askOrGuess');
   d.id = EXAMPLE_PIPELINE_IDS[stage];
-  var stageLabel = stage==='revision' ? 'needs revision' : stage==='pending' ? 'pending polish' : 'shipped';
-  d.studentName = 'Example ('+stageLabel+')';
+  d.studentName = 'Example ('+PIPELINE_STAGE_LABELS[stage]+')';
+  d.submittedAt = Date.now();
 
   if(stage==='revision'){
     d.status = 'revision';
@@ -1828,7 +1892,7 @@ function buildPipelineExampleDraft(stage){
     return {draft:d, pending:null};
   }
 
-  // 'pending' and 'shipped' both start from an accepted draft.
+  // 'pending', 'ready', and 'shipped' all start from an accepted draft.
   d.status = 'accepted';
   d.acceptedAt = Date.now();
   d.coachNotes = [{text:'Really strong set — accepting as-is. Polishing the parent-facing copy now.', at:Date.now()}];
@@ -1836,6 +1900,10 @@ function buildPipelineExampleDraft(stage){
   p.parentBlurb = 'This week, your kid is exploring the tug-of-war between asking directly for '+
     'what you need and hoping someone notices without being told — through six everyday '+
     'moments, from a missed birthday invite to a teammate who\'s gone quiet on a call. '+MANTRA;
+  if(stage==='ready' || stage==='shipped'){
+    p.status = 'ready';
+    p.readyAt = Date.now() - (1000*60*60*24*7); // a week ago
+  }
   if(stage==='shipped'){
     p.status = 'shipped';
     p.sentToCodeAt = Date.now() - (1000*60*60*24*30); // 30 days ago, so it doesn't read as "just shipped"
@@ -1861,6 +1929,7 @@ function seedPipelineExample(stage){
     var mergedDraft = Object.assign({}, freshDraft, {
       status: old.status || freshDraft.status,
       acceptedAt: old.acceptedAt || freshDraft.acceptedAt,
+      submittedAt: old.submittedAt || freshDraft.submittedAt,
       coachNotes: old.coachNotes || freshDraft.coachNotes,
       editorNotes: old.editorNotes || freshDraft.editorNotes,
       createdAt: old.createdAt || freshDraft.createdAt,
@@ -1877,6 +1946,8 @@ function seedPipelineExample(stage){
           status: oldP.status || freshPending.status,
           parentBlurb: oldP.parentBlurb || freshPending.parentBlurb,
           usageWeeks: oldP.usageWeeks || freshPending.usageWeeks,
+          submittedAt: oldP.submittedAt || freshPending.submittedAt,
+          readyAt: oldP.readyAt || freshPending.readyAt,
           sentToCodeAt: oldP.sentToCodeAt || freshPending.sentToCodeAt,
           createdAt: oldP.createdAt || freshPending.createdAt,
           updatedAt: oldP.updatedAt || freshPending.updatedAt
@@ -1901,6 +1972,7 @@ function ensureExampleDraftsSeeded(){
       fresh.id = id;
       if(!existing){
         fresh.status = 'submitted';
+        fresh.submittedAt = Date.now();
         return window.storage.set('draft:'+id, JSON.stringify(fresh), true);
       }
       // Already seeded before. Re-sync the content on every load — title, scenarios,
@@ -1916,6 +1988,7 @@ function ensureExampleDraftsSeeded(){
       if(!old) return window.storage.set('draft:'+id, JSON.stringify(fresh), true);
       var merged = Object.assign({}, fresh, {
         status: old.status || 'submitted',
+        submittedAt: old.submittedAt || Date.now(),
         coachNotes: old.coachNotes || [],
         editorNotes: old.editorNotes || [],
         coachMessage: old.coachMessage || '',
@@ -2179,27 +2252,46 @@ function requireCoachSignIn(msg){
   state.inboxList=[]; state.flaggedList=[]; state.inboxLoading=false;
   render();
 }
+// 'reviewed' was retired once "Mark reviewed" became "Accepted" — any draft still
+// carrying it is a leftover from before this pipeline existed. Fold it in for real:
+// flip it to 'accepted' and give it a pending:<id> record, exactly like acceptDraft
+// would, rather than leaving it stuck in a status nothing shows any more. Idempotent —
+// a draft only ever does this once, since its status stops being 'reviewed' afterward.
+function migrateReviewedDrafts(draftList){
+  var reviewedOnes = draftList.filter(function(d){ return d.status==='reviewed'; });
+  if(!reviewedOnes.length) return Promise.resolve();
+  return Promise.all(reviewedOnes.map(function(d){
+    return window.storage.get('pending:'+d.id, true).then(function(existingPending){
+      d.status = 'accepted';
+      if(!d.acceptedAt) d.acceptedAt = d.updatedAt || Date.now();
+      d.updatedAt = Date.now();
+      var writes = [window.storage.set('draft:'+d.id, JSON.stringify(d), true)];
+      if(!existingPending) writes.push(window.storage.set('pending:'+d.id, JSON.stringify(newPendingFromDraft(d)), true));
+      return Promise.all(writes);
+    }).catch(function(e){ console.error('reviewed->pending migration failed for', d.id, e); });
+  }));
+}
 function loadInbox(){
   state.inboxError=''; state.inboxLoading=true;
   ensureExampleDraftsSeeded().then(function(){
     return listAllDrafts();
   }).then(function(list){
-    state.inboxList=list; state.inboxLoading=false; render();
+    return migrateReviewedDrafts(list).then(function(){
+      // Re-fetch both lists post-migration, rather than patch the in-memory ones, so the
+      // newly-created pending records (and the drafts' flipped status) show up together.
+      return Promise.all([listAllDrafts(), listAllPending()]);
+    });
+  }).then(function(results){
+    state.inboxList = results[0];
+    state.pendingList = results[1];
+    state.inboxLoading = false;
+    render();
   }).catch(function(e){
     console.error('inbox load failed', e);
     state.inboxLoading=false;
     if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
     state.inboxError='Couldn\'t reach storage, so drafts can\'t be listed right now. Nothing has been lost — reload to try again.';
     state.inboxList=[]; render();
-  });
-  // Pending polish + past-sessions rows load alongside the main draft list, on their own
-  // failure path — a hiccup here shouldn't block the main inbox from showing.
-  listAllPending().then(function(list){
-    state.pendingList=list; render();
-  }).catch(function(e){
-    console.error('pending list load failed', e);
-    if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
-    state.pendingList=[]; render();
   });
   // Same reasoning as enterDraft, but this one costs a full Redis SCAN of moduser:*
   // every time a coach opens the inbox — for a flagged-accounts list that is always
@@ -2628,8 +2720,10 @@ function noteBlockHtml(d, fieldKey, opts){
 
   var controlHtml = state.composingNoteField===fieldKey
     ? '<div class="field-note-compose">'+
-        '<div class="field-note-compose-label">Note on: '+esc(fieldNoteLabel(fieldKey, d))+'</div>'+
-        '<textarea id="fieldNoteComposeInput" maxlength="500" placeholder="What should they change here?"></textarea>'+
+        '<div class="field-note-compose-label">Note on: '+esc(fieldNoteLabel(fieldKey, d))+
+          ' <span id="fieldNoteComposeSaveIndicator" class="rail-save-indicator saved" style="text-transform:none; letter-spacing:0; font-family:inherit;"></span>'+
+        '</div>'+
+        '<textarea id="fieldNoteComposeInput" maxlength="500" placeholder="What should they change here?">'+esc((d.noteComposeDrafts||{})[fieldKey]||'')+'</textarea>'+
         '<div class="field-note-compose-actions">'+
           '<button type="button" class="btn btn-ghost btn-small" data-action="cancelFieldNote">Cancel</button>'+
           '<button type="button" class="btn btn-primary btn-small" data-action="saveFieldNote" data-id="'+esc(d.id)+'" data-field="'+esc(fieldKey)+'"'+(state.editorNoteBusy?' disabled':'')+'>Save note</button>'+
@@ -2729,7 +2823,7 @@ function renderReviewPreview(d, opts){
 // same visual language on both sides of the review, not a separate scheme each.
 var STAGE_EMOJI = {
   draft: '📝', submitted: '📥', revision: '✏️', accepted: '🎉',
-  reviewed: '✅', pending: '✨', shipped: '🚀'
+  reviewed: '✅', pending: '✨', ready: '📦', shipped: '🚀'
 };
 // Single source of truth for the status badge — three call sites (student review, inbox
 // row, coach review) used to each carry their own copy of this ternary, which is how the
@@ -2832,6 +2926,28 @@ function renderInboxGroup(label, list, rowFn){
     list.map(rowFn || renderInboxRow).join('')+
   '</div>';
 }
+// Coach inbox search/filter — applied to both draft: and pending: records before they're
+// split into groups, so a search narrows every group (and Past sessions) consistently.
+// "Date submitted" reads submittedAt on either record type (see newPendingFromDraft,
+// which carries it over) rather than updatedAt, which drifts every time anyone — coach
+// or student — touches the record again.
+function matchesInboxFilter(record){
+  var q = (state.inboxSearch||'').trim().toLowerCase();
+  if(q){
+    var hay = ((record.title||'')+' '+(record.studentName||'')).toLowerCase();
+    if(hay.indexOf(q)===-1) return false;
+  }
+  var dateVal = record.submittedAt;
+  if(state.inboxDateFrom){
+    var fromTs = new Date(state.inboxDateFrom+'T00:00:00').getTime();
+    if(!dateVal || dateVal < fromTs) return false;
+  }
+  if(state.inboxDateTo){
+    var toTs = new Date(state.inboxDateTo+'T23:59:59').getTime();
+    if(!dateVal || dateVal > toTs) return false;
+  }
+  return true;
+}
 // One "Week of <date>" entry reads better than the raw ISO string a <input type="date">
 // hands back — this is display-only, the stored value stays the plain "YYYY-MM-DD".
 function formatWeekOf(isoDate){
@@ -2840,40 +2956,61 @@ function formatWeekOf(isoDate){
   return dt.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
 }
 function renderPendingRow(p){
-  var isShipped = p.status==='shipped';
-  var statusLine = isShipped
+  var badgeCls = p.status==='shipped' ? 'status-reviewed' : p.status==='ready' ? 'status-ready' : 'status-submitted';
+  var badgeLabel = p.status==='shipped' ? (STAGE_EMOJI.shipped+' Shipped')
+    : p.status==='ready' ? (STAGE_EMOJI.ready+' Ready for code')
+    : (STAGE_EMOJI.pending+' Pending');
+  var statusLine = p.status==='shipped'
     ? ('Sent to code '+timeAgo(p.sentToCodeAt)+(p.usageWeeks.length? ' · used '+p.usageWeeks.length+'×' : ''))
+    : p.status==='ready'
+    ? ('Ready for code '+timeAgo(p.readyAt))
     : 'Accepted '+timeAgo(p.createdAt)+' — ready to polish';
   return ''+
   '<div class="inbox-row" data-action="openPendingDraft" data-id="'+esc(p.id)+'">'+
     '<div class="ir-left"><h4>'+esc(p.title||'Untitled')+' — <span style="font-weight:400;">'+esc(p.studentName)+'</span></h4><p>CODE '+esc(p.id)+' · '+esc(statusLine)+'</p></div>'+
-    '<span class="status-badge '+(isShipped?'status-reviewed':'status-submitted')+'">'+(isShipped?STAGE_EMOJI.shipped+' Shipped':STAGE_EMOJI.pending+' Pending')+'</span>'+
+    '<span class="status-badge '+badgeCls+'">'+badgeLabel+'</span>'+
   '</div>';
 }
 function renderShellInbox(){
-  var submitted = state.inboxList.filter(function(d){ return d.status==='submitted'; });
-  var needsRevision = state.inboxList.filter(function(d){ return d.status==='revision'; });
-  var inProgress = state.inboxList.filter(function(d){ return d.status==='draft'; });
-  var reviewed = state.inboxList.filter(function(d){ return d.status==='reviewed'; });
-  var pendingRows = state.pendingList.filter(function(p){ return p.status==='pending'; });
-  var shippedRows = state.pendingList.filter(function(p){ return p.status==='shipped'; });
-  var rows = (state.inboxList.length || state.pendingList.length) ? (
-    renderInboxGroup(STAGE_EMOJI.submitted+' Ready for review', submitted)+
-    renderInboxGroup(STAGE_EMOJI.revision+' Needs revision', needsRevision)+
-    renderInboxGroup(STAGE_EMOJI.draft+' In progress', inProgress)+
-    renderInboxGroup(STAGE_EMOJI.pending+' Pending polish', pendingRows, renderPendingRow)+
-    renderInboxGroup(STAGE_EMOJI.reviewed+' Reviewed', reviewed)
+  var filteredDrafts = state.inboxList.filter(matchesInboxFilter);
+  var filteredPending = state.pendingList.filter(matchesInboxFilter);
+  var submitted = filteredDrafts.filter(function(d){ return d.status==='submitted'; });
+  var needsRevision = filteredDrafts.filter(function(d){ return d.status==='revision'; });
+  var inProgress = filteredDrafts.filter(function(d){ return d.status==='draft'; });
+  // 'reviewed' drafts don't get their own group any more — loadInbox migrates every one
+  // into a real pending: record (see migrateReviewedDrafts) before this ever renders, so
+  // by the time a coach sees the inbox they've already folded into Pending polish below.
+  var pendingRows = filteredPending.filter(function(p){ return p.status==='pending'; });
+  var readyRows = filteredPending.filter(function(p){ return p.status==='ready'; });
+  var shippedRows = filteredPending.filter(function(p){ return p.status==='shipped'; });
+  var hasAnyData = state.inboxList.length || state.pendingList.length;
+  var hasFilteredRows = submitted.length || needsRevision.length || inProgress.length || pendingRows.length || readyRows.length || shippedRows.length;
+  var rows = hasAnyData ? (
+    hasFilteredRows ? (
+      renderInboxGroup(STAGE_EMOJI.submitted+' Ready for review', submitted)+
+      renderInboxGroup(STAGE_EMOJI.revision+' Needs revision', needsRevision)+
+      renderInboxGroup(STAGE_EMOJI.draft+' In progress', inProgress)+
+      renderInboxGroup(STAGE_EMOJI.pending+' Pending polish', pendingRows, renderPendingRow)
+    ) : '<div class="empty-state">No drafts match this search.</div>'
   ) : (state.inboxLoading
     ? '<div class="empty-state">Loading drafts…</div>'
     : (state.inboxError
       ? ''
       : '<div class="empty-state">No drafts yet. Once a student starts a session, it\'ll show up here.</div>'));
-  // A separate section, not another priority group — a shipped session isn't waiting on
-  // the coach for anything; it's an archive they occasionally add a "used again" date to.
-  var pastSection = shippedRows.length ? (
+  // A separate archive, not another priority group — nothing here is waiting on the
+  // coach. Split in two: done polishing and waiting to actually ship, versus already
+  // sent (where the only ongoing task is logging reuse — see the usage-weeks panel).
+  var pastSection = (readyRows.length || shippedRows.length) ? (
     '<div style="margin-top:34px;">'+
-      '<h3 style="color:#fff; font-size:16px; margin-bottom:12px;">📚 Past sessions ('+shippedRows.length+')</h3>'+
-      shippedRows.map(renderPendingRow).join('')+
+      '<h3 style="color:#fff; font-size:16px; margin-bottom:6px;">📚 Past sessions</h3>'+
+      (readyRows.length ? (
+        '<div class="inbox-group"><h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+STAGE_EMOJI.ready+' Ready for Code ('+readyRows.length+')</h3>'+
+        readyRows.map(renderPendingRow).join('')+'</div>'
+      ) : '')+
+      (shippedRows.length ? (
+        '<div class="inbox-group"><h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+STAGE_EMOJI.shipped+' Shipped ('+shippedRows.length+')</h3>'+
+        shippedRows.map(renderPendingRow).join('')+'</div>'
+      ) : '')+
     '</div>'
   ) : '';
   var errorBanner = state.inboxError ? '<div class="banner">⚠️ '+esc(state.inboxError)+'</div>' : '';
@@ -2902,6 +3039,13 @@ function renderShellInbox(){
         '<button class="btn btn-ghost-light" data-action="goHome">← Back home</button>'+
         '<button class="btn btn-ghost-light" data-action="coachSignOut">Sign out</button>'+
       '</div>'+
+    '</div>'+
+    '<div class="inbox-filter-bar">'+
+      '<input type="text" id="inboxSearchInput" placeholder="Search by title or username…" value="'+esc(state.inboxSearch)+'">'+
+      '<label class="inbox-filter-date-label">Submitted<input type="date" id="inboxDateFromInput" value="'+esc(state.inboxDateFrom)+'" title="Submitted from"></label>'+
+      '<span class="inbox-filter-sep">–</span>'+
+      '<input type="date" id="inboxDateToInput" value="'+esc(state.inboxDateTo)+'" title="Submitted to">'+
+      ((state.inboxSearch || state.inboxDateFrom || state.inboxDateTo) ? '<button type="button" class="btn btn-ghost-light btn-small" data-action="clearInboxFilter">Clear</button>' : '')+
     '</div>'+
     errorBanner+
     flaggedSection+
@@ -2983,8 +3127,8 @@ function renderShellInboxDraft(){
     (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
     '<div class="panel">'+
-      '<h3>Leave feedback for '+esc(d.studentName)+'</h3>'+
-      '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass? (Accepting sends this along as a congratulatory note.)"></textarea></div>'+
+      '<h3>Leave feedback for '+esc(d.studentName)+' <span id="coachFeedbackSaveIndicator" class="rail-save-indicator saved" style="text-transform:none; letter-spacing:0; font-family:inherit;"></span></h3>'+
+      '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass? (Accepting sends this along as a congratulatory note.)">'+esc(d.coachDraftNote||'')+'</textarea></div>'+
       '<div class="review-actions">'+
         '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back with notes</button>'+
         // The two seeded examples are reference material, not a student's own work —
@@ -3020,7 +3164,9 @@ function renderPendingScreen(){
       '<div class="empty-state">Loading…</div>'+
     '</div>';
   }
-  var locked = p.status==='shipped';
+  // 'ready' means the coach has signaled polishing is done, same as 'shipped' —
+  // fields lock at that point, and only "Mark shipped" / usage weeks stay live.
+  var locked = p.status==='ready' || p.status==='shipped';
 
   var scenarioBlocks = p.scenarios.map(function(sc, i){
     var optsHtml = sc.options.map(function(o, oi){
@@ -3051,18 +3197,28 @@ function renderPendingScreen(){
       '<button type="button" class="btn-icon" data-action="removeUsageWeek" data-week="'+esc(w)+'" title="Remove">✕</button></div>';
   }).join('');
 
-  // The "pending polish" pipeline example is meant to stay pending — shipping it would
-  // collapse two demo stages into one, so it gets the same reference-material treatment
-  // as the two seeded example sessions.
-  var shipControls = locked
-    ? '<div class="hint">Sent to code '+timeAgo(p.sentToCodeAt)+'.</div>'
-    : (isSeededExampleId(p.id)
-      ? '<div class="hint">This is a pipeline example, so there\'s nothing to ship — it\'s meant to stay Pending.</div>'
+  // The pending-polish pipeline example is meant to stay pending — advancing it would
+  // collapse the demo stages into each other, so it gets the same reference-material
+  // treatment as the two seeded example sessions.
+  var isPipelineDemo = isSeededExampleId(p.id);
+  var shipControls;
+  if(p.status==='shipped'){
+    shipControls = '<div class="hint">Sent to code '+timeAgo(p.sentToCodeAt)+'.</div>';
+  } else if(p.status==='ready'){
+    shipControls = isPipelineDemo
+      ? '<div class="hint">This is a pipeline example, so there\'s nothing to ship — it\'s meant to stay Ready for code.</div>'
       : (''+
           '<button type="button" class="btn btn-ghost" disabled title="Coming soon — will export directly to the session code / Notion">🚀 Ship to code — coming soon!</button>'+
-          '<button type="button" class="btn btn-primary" data-action="markSentToCode" data-id="'+esc(p.id)+'">✓ Mark as sent to code</button>'
-        )
-      );
+          '<button type="button" class="btn btn-primary" data-action="markSentToCode" data-id="'+esc(p.id)+'">✓ Mark shipped</button>'
+        );
+  } else {
+    shipControls = isPipelineDemo
+      ? '<div class="hint">This is a pipeline example, so there\'s nothing to mark ready — it\'s meant to stay Pending.</div>'
+      : '<button type="button" class="btn btn-primary" data-action="markPendingReady" data-id="'+esc(p.id)+'">📦 Mark ready for code</button>';
+  }
+
+  var statusBadgeCls = p.status==='shipped' ? 'status-reviewed' : p.status==='ready' ? 'status-ready' : 'status-submitted';
+  var statusBadgeLabel = p.status==='shipped' ? 'Shipped' : p.status==='ready' ? 'Ready for code' : 'Pending';
 
   var blurbMissingMantra = !locked && p.parentBlurb.trim() && p.parentBlurb.indexOf(MANTRA)===-1;
 
@@ -3070,7 +3226,7 @@ function renderPendingScreen(){
   '<div class="home-wrap inbox-draft-wrap">'+
     '<button class="btn btn-ghost-light btn-small" data-action="closePendingDraft" style="margin-bottom:16px;">← All drafts</button>'+
     '<div style="margin-bottom:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">'+
-      '<span class="status-badge '+(locked?'status-reviewed':'status-submitted')+'">'+(locked?'Shipped':'Pending')+'</span>'+
+      '<span class="status-badge '+statusBadgeCls+'">'+statusBadgeLabel+'</span>'+
       (locked? '' : '<span id="pendingSaveIndicator" class="rail-save-indicator '+pendingSaveStatus+'">'+saveStatusText(pendingSaveStatus)+'</span>')+
     '</div>'+
     '<div class="page-head"><h2>'+esc(p.title||'Untitled')+' <span style="font-weight:400; font-size:16px; color:var(--ink-soft);">— '+esc(p.studentName)+'</span></h2></div>'+
@@ -3089,11 +3245,15 @@ function renderPendingScreen(){
     pendingCheckinBlockHtml(p.halftime, 'halftime', 'Halftime', locked)+
     scenarioBlocks.slice(3).join('')+
     pendingCheckinBlockHtml(p.reflection, 'reflection', 'Closing reflection', locked)+
-    '<div class="panel">'+
-      '<h3>Used in sessions</h3>'+
-      (usageWeeksHtml || '<div class="hint" style="margin-bottom:10px;">Not used yet.</div>')+
-      '<div class="usage-week-add"><input type="date" id="usageWeekInput"><button type="button" class="btn btn-ghost btn-small" data-action="addUsageWeek" data-id="'+esc(p.id)+'">+ Add a week used</button></div>'+
-    '</div>'+
+    // Usage tracking only makes sense once it's actually shipped — nothing to log while
+    // it's still pending or ready-but-not-yet-sent.
+    (p.status==='shipped' ? (
+      '<div class="panel">'+
+        '<h3>Used in sessions</h3>'+
+        (usageWeeksHtml || '<div class="hint" style="margin-bottom:10px;">Not used yet.</div>')+
+        '<div class="usage-week-add"><input type="date" id="usageWeekInput"><button type="button" class="btn btn-ghost btn-small" data-action="addUsageWeek" data-id="'+esc(p.id)+'">+ Add a week used</button></div>'+
+      '</div>'
+    ) : '')+
     '<div class="panel"><div class="review-actions">'+shipControls+'</div></div>'+
   '</div>';
 }
@@ -3756,7 +3916,7 @@ function updateDraftField(bind, el, oidx, qidx){
 // scrolling page here.
 function updatePendingField(bind, el, sidx, oidx, qidx){
   var p = state.pendingDraft;
-  if(!p || p.status==='shipped') return;
+  if(!p || p.status==='ready' || p.status==='shipped') return;
   var v = el.value;
   if(bind==='title') p.title=v;
   else if(bind==='parentBlurb') p.parentBlurb=v;
@@ -3775,6 +3935,29 @@ function updatePendingField(bind, el, sidx, oidx, qidx){
   else if(bind==='reflectionRefl') p.reflection.reflection=v;
 }
 
+// The inbox search box needs the whole list to re-filter live, but a full render()
+// replaces the input's own DOM node — which would drop focus and cursor position mid-
+// keystroke. Debounce it, then restore focus (and cursor) to whatever was focused
+// before the render, by id. Only the search box uses this; the date pickers are
+// discrete change events, not continuous typing, so they render() directly.
+var inboxFilterTimer = null;
+function debounceInboxFilterRender(){
+  if(inboxFilterTimer) clearTimeout(inboxFilterTimer);
+  inboxFilterTimer = setTimeout(function(){
+    inboxFilterTimer = null;
+    var active = document.activeElement;
+    var activeId = active && active.id;
+    var selStart = active && typeof active.selectionStart === 'number' ? active.selectionStart : null;
+    render();
+    if(activeId){
+      var el = document.getElementById(activeId);
+      if(el){
+        el.focus();
+        if(selStart!=null && el.setSelectionRange) el.setSelectionRange(selStart, selStart);
+      }
+    }
+  }, 300);
+}
 function attachGlobalHandlers(){
   // text inputs / textareas -> update state without full rerender
   app.querySelectorAll('input[data-bind], textarea[data-bind]').forEach(function(el){
@@ -3837,6 +4020,54 @@ function attachGlobalHandlers(){
     blurbEl.addEventListener('input', function(){
       var warn = document.getElementById('pendingParentBlurbWarning');
       if(warn) warn.hidden = !blurbEl.value.trim() || blurbEl.value.indexOf(MANTRA)!==-1;
+    });
+  }
+  // Coach inbox search/filter — see matchesInboxFilter. Search is continuous typing
+  // (debounced, focus-preserving); the date pickers are discrete change events, so they
+  // just render() straight away.
+  var inboxSearchEl = document.getElementById('inboxSearchInput');
+  if(inboxSearchEl){
+    inboxSearchEl.addEventListener('input', function(){
+      state.inboxSearch = inboxSearchEl.value;
+      debounceInboxFilterRender();
+    });
+  }
+  var inboxDateFromEl = document.getElementById('inboxDateFromInput');
+  if(inboxDateFromEl){
+    inboxDateFromEl.addEventListener('change', function(){
+      state.inboxDateFrom = inboxDateFromEl.value;
+      render();
+    });
+  }
+  var inboxDateToEl = document.getElementById('inboxDateToInput');
+  if(inboxDateToEl){
+    inboxDateToEl.addEventListener('change', function(){
+      state.inboxDateTo = inboxDateToEl.value;
+      render();
+    });
+  }
+  // Coach "Leave feedback" box — autosaves onto the draft as coachDraftNote, mirroring
+  // the Pending screen's autosave, so a coach's in-progress note survives a reload
+  // before they've clicked Send back / Accepted. See saveCoachDraftNote.
+  var coachFeedbackEl = document.getElementById('coachFeedbackText');
+  if(coachFeedbackEl){
+    coachFeedbackEl.addEventListener('input', function(){
+      var d = state.inboxList.filter(function(x){ return x.id===state.inboxSelectedId; })[0];
+      if(!d) return;
+      d.coachDraftNote = coachFeedbackEl.value;
+      debounceCoachNoteSave(d, 'coachFeedbackSaveIndicator');
+    });
+  }
+  // Field-note compose box — same autosave treatment, scoped to whichever field is
+  // currently open (state.composingNoteField), keyed so switching fields before saving
+  // doesn't lose either draft.
+  var noteComposeEl = document.getElementById('fieldNoteComposeInput');
+  if(noteComposeEl){
+    noteComposeEl.addEventListener('input', function(){
+      var d = state.inboxList.filter(function(x){ return x.id===state.inboxSelectedId; })[0];
+      if(!d || !state.composingNoteField) return;
+      d.noteComposeDrafts[state.composingNoteField] = noteComposeEl.value;
+      debounceCoachNoteSave(d, 'fieldNoteComposeSaveIndicator');
     });
   }
 }
@@ -4041,6 +4272,11 @@ function handleClick(e){
     loadInbox();
     return;
   }
+  if(action==='clearInboxFilter'){
+    state.inboxSearch=''; state.inboxDateFrom=''; state.inboxDateTo='';
+    render();
+    return;
+  }
   if(action==='openInboxFeedback'){
     state.screen='inboxFeedback';
     render();
@@ -4139,6 +4375,10 @@ function handleClick(e){
     var revisionId = t.getAttribute('data-id');
     var revisionFbEl = document.getElementById('coachFeedbackText');
     var revisionText = revisionFbEl ? revisionFbEl.value.trim() : '';
+    // A pending autosave from the feedback box or a note-compose box (debounceCoachNoteSave)
+    // must not fire after this write — it would carry the pre-send-back in-memory record
+    // and silently revert the status change. See saveCoachDraftRecord.
+    if(coachDraftSaveTimers[revisionId]){ clearTimeout(coachDraftSaveTimers[revisionId]); delete coachDraftSaveTimers[revisionId]; }
     loadDraft(revisionId).then(function(d){
       if(!d){
         state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
@@ -4147,6 +4387,7 @@ function handleClick(e){
         return;
       }
       if(revisionText) d.coachNotes.push({text:revisionText, at:Date.now()});
+      d.coachDraftNote = ''; // committed into the note above — don't leave it lingering as a draft
       d.status = 'revision';
       d.updatedAt = Date.now();
       return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
@@ -4174,6 +4415,7 @@ function handleClick(e){
     var acceptId = t.getAttribute('data-id');
     var acceptFbEl = document.getElementById('coachFeedbackText');
     var acceptText = acceptFbEl ? acceptFbEl.value.trim() : '';
+    if(coachDraftSaveTimers[acceptId]){ clearTimeout(coachDraftSaveTimers[acceptId]); delete coachDraftSaveTimers[acceptId]; }
     loadDraft(acceptId).then(function(d){
       if(!d){
         state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
@@ -4182,6 +4424,7 @@ function handleClick(e){
         return;
       }
       if(acceptText) d.coachNotes.push({text:acceptText, at:Date.now()});
+      d.coachDraftNote = '';
       d.status = 'accepted';
       d.acceptedAt = Date.now();
       d.updatedAt = Date.now();
@@ -4217,6 +4460,15 @@ function handleClick(e){
     return;
   }
   if(action==='cancelFieldNote'){
+    // Discard the autosaved scratch too, not just the open compose box — otherwise a
+    // cancelled note's half-written text quietly persists and comes back next time this
+    // field's "+ Note" is clicked.
+    var cancelDraft = state.inboxList.filter(function(x){ return x.id===state.inboxSelectedId; })[0];
+    if(cancelDraft && state.composingNoteField && cancelDraft.noteComposeDrafts[state.composingNoteField]){
+      delete cancelDraft.noteComposeDrafts[state.composingNoteField];
+      if(coachDraftSaveTimers[cancelDraft.id]){ clearTimeout(coachDraftSaveTimers[cancelDraft.id]); delete coachDraftSaveTimers[cancelDraft.id]; }
+      saveCoachDraftRecord(cancelDraft, 'fieldNoteComposeSaveIndicator');
+    }
     state.composingNoteField = null;
     render();
     return;
@@ -4229,6 +4481,9 @@ function handleClick(e){
     if(!noteText){ state.composingNoteField = null; render(); return; }
     state.editorNoteBusy = true;
     render();
+    // Same reasoning as sendBackForRevision/acceptDraft — don't let a pending compose
+    // autosave fire after this authoritative write and clobber the freshly-added note.
+    if(coachDraftSaveTimers[noteDraftId]){ clearTimeout(coachDraftSaveTimers[noteDraftId]); delete coachDraftSaveTimers[noteDraftId]; }
     loadDraft(noteDraftId).then(function(d){
       if(!d){
         state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
@@ -4239,6 +4494,7 @@ function handleClick(e){
         return;
       }
       d.editorNotes.push(newEditorNote(noteField, noteText));
+      delete d.noteComposeDrafts[noteField]; // committed into the note above
       d.updatedAt = Date.now();
       return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
         return listAllDrafts();
@@ -4359,9 +4615,17 @@ function handleClick(e){
     render();
     return;
   }
+  if(action==='markPendingReady'){
+    if(!state.pendingDraft) return;
+    if(!window.confirm('Mark this session ready for code? Fields lock once it is — you can still ship it from here after.')) return;
+    state.pendingDraft.status = 'ready';
+    state.pendingDraft.readyAt = Date.now();
+    savePendingDraft().then(function(){ render(); });
+    return;
+  }
   if(action==='markSentToCode'){
     if(!state.pendingDraft) return;
-    if(!window.confirm('Mark this session as sent to code? It will move to Past sessions.')) return;
+    if(!window.confirm('Mark this session as sent to code? It will move to Shipped, under Past sessions.')) return;
     state.pendingDraft.status = 'shipped';
     state.pendingDraft.sentToCodeAt = Date.now();
     savePendingDraft().then(function(){ render(); });
@@ -4519,6 +4783,10 @@ function handleClick(e){
     if(blockReason){ state.submitError = blockReason; render(); return; }
     state.submitError = '';
     state.draft.status='submitted';
+    // First submission only — a resubmit after "sent back with notes" shouldn't push
+    // this date forward, or the coach inbox's "date submitted" search would stop
+    // reflecting when the student actually first sent this in.
+    if(!state.draft.submittedAt) state.draft.submittedAt = Date.now();
     saveDraft();
     render();
     return;
