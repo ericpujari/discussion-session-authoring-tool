@@ -31,7 +31,9 @@ Two roles, in the one tool:
   work, resumable later by typing that same username again.
 - **Coaches** review what students submit, through a separate password-gated inbox
   (`COACH_PASSWORD` in `.env.example`) — not the student-facing home screen. A coach can
-  leave notes, send a draft back for revision, or mark it reviewed.
+  leave per-field notes, send a draft back for revision, or accept it and carry it
+  through polishing, "ready for code," and shipping — see "Current status" below for the
+  full pipeline.
 
 This was forked from an earlier, separate student practice tool that lived at
 `reference/session_builder.html` in this repo (since removed — see "Reference materials"
@@ -121,34 +123,66 @@ object + `render()` dispatcher — see "Architecture conventions") backed by thr
 serverless functions in `api/`:
 
 - `api/storage.js` — a Redis-backed key/value store: draft autosave (with retry and a
-  size cap), resume-by-username, the coach inbox, private per-draft sticky notes, and
-  coach sign-in (a shared password exchanged for a short-lived token).
+  size cap), resume-by-username, the coach inbox, private per-draft sticky notes, coach
+  sign-in (a shared password exchanged for a short-lived token), and a coach-owned
+  `pending:<id>` record per accepted draft (a student gets scoped, read-only access to
+  their own — see "The pipeline after submission" below).
 - `api/noun-project-search.js` + `api/icon-asset.js` — a signed proxy to the Noun Project
   icon API, plus a second endpoint that re-fetches a chosen icon by id and embeds it as a
   permanent `data:` URI (Noun Project's own asset URLs expire roughly an hour after
   they're issued, which would otherwise rot every icon a student ever picked).
 
-Drafting flow (answering what used to be open questions): storyboard view with
-per-scenario editing panels, not one long form — Setup → Storyboard (6 scenario cards +
-a fixed halftime card, drag or move-buttons to reorder) → Closing reflection → Review &
-submit. Multi-user save-and-resume, by username, no accounts. Export is Markdown
-matching the reference sessions' structure. The review/handoff step is the coach inbox
-described above — export is not the end of the tool's job, submission is. The
-per-scenario reflection question (one per scenario in the final structure — see "Source
-of truth" above) is written by the coach, not the student; the field is hidden from the
-student's scenario editor.
+**Drafting flow.** Storyboard view with per-scenario editing panels, not one long form —
+Setup → Storyboard (6 scenario cards + a fixed halftime card, drag or move-buttons to
+reorder) → Closing reflection → Review & submit. Multi-user save-and-resume, by username,
+no accounts. Export is Markdown matching the reference sessions' structure. The
+review/handoff step is the coach inbox described below — export is not the end of the
+tool's job, submission is. Setup's "Overall idea for the session" is explicitly a
+brainstorm/scratch space for the student and their coach, not parent-facing copy — the
+actual parent blurb is written later, by the coach, on the Pending polish screen (see
+below). The per-scenario reflection question (one per scenario in the final structure —
+see "Source of truth" above) is likewise the coach's to write, not the student's; the
+field is hidden from the student's scenario editor.
 
-Coach review, beyond a single feedback box: a coach can leave a note on any individual
-field (title, a scenario's setup, one option's rationale, etc.) via "+ Note" in the
-review view; open notes surface back to the student as a draggable, read-only "editor's
-note" on the matching screen until the coach ticks them done. "Send back with notes"
-reverts a submission to a distinct `revision` status (its own inbox group) rather than
-folding back into "In progress". Accepting a draft ("Accepted ✅") freezes the student's
-copy (read-only, download still works) and spins off a separate `pending:<id>` record —
-a coach-only polish screen with every field editable plus the parent blurb and the six
-reflection questions. From there, "Mark as sent to code" moves it into a "Past sessions"
-archive (student username, date sent, a running list of "week of" reuse dates); "Ship to
-code" itself is a disabled coming-soon button, not yet wired to anything.
+**Coach review, beyond a single feedback box.** A coach can leave a note on any
+individual field (title, a scenario's setup, one option's rationale, etc.) via "+ Note"
+in the review view — notes render inline to the right of the text they're about, not
+stacked underneath. Open notes surface back to the student as a draggable, read-only
+"editor's note" on the matching screen until the coach ticks them done. "Send back with
+notes" reverts a submission to a distinct `revision` status (its own inbox group —
+"Sent back with notes" on the student side) rather than folding back into "In progress".
+The "Leave feedback" box and whichever field-note compose box is open both autosave as
+the coach types (`coachDraftNote` / `noteComposeDrafts` on the draft record), each with
+its own Saved/Saving indicator.
+
+**The pipeline after submission.** Accepting a draft ("Accepted ✅") freezes the
+student's copy (every field disabled, read-only — download still works) and spins off a
+separate `pending:<id>` record: a coach-only polish screen with every field editable,
+plus the parent blurb and the six reflection questions the student never wrote. From
+there the coach clicks "Mark ready for code" (locks the pending record's fields — done
+polishing, not yet actually shipped) and later "Mark shipped" (moves it into a "Past
+sessions" archive, split into "Ready for Code" and "Shipped" groups, with a running list
+of "week of" reuse dates once shipped). "Ship to code" itself is still a disabled
+coming-soon button, not wired to anything. A leftover legacy `reviewed`-status draft
+(from before this pipeline existed) is migrated into a real pending record automatically
+the next time a coach opens the inbox — that status no longer has its own place in the
+UI.
+
+**Visibility for both sides.** The coach inbox has a search/filter bar (title, username,
+submitted-date range — filtering by `submittedAt`, not `updatedAt`, so a coach's own note
+or a resubmission doesn't change what a draft matches). Every status badge and inbox
+group heading draws from one shared emoji-per-stage map (`STAGE_EMOJI` in
+`authoring-tool.html`). The student's home screen carries the same scheme as "Your
+inbox" — a status badge per draft, including a finer "being polished" vs. "shipped to
+code" reading for accepted drafts once their pending record's stage is known.
+
+**Full pipeline example, always in the inbox.** Alongside the two seeded example
+sessions (`EXAMPLE-HMG`, `EXAMPLE-AOG`, both sitting at "Ready for review"), four more
+synthetic drafts built from the same "Ask or Guess?" content walk that session through
+every other stage — needs revision (with a real inline editor's note demonstrating the
+balance-test guardrail), pending polish, ready for code, and shipped (with usage-week
+history) — so a coach opening the inbox for the first time always has a worked example
+of the whole pipeline to look at, not an empty list.
 
 Known, accepted gap for the current test deployment: no real student authentication —
 resume-by-username means typing someone else's username reaches their drafts. See the
