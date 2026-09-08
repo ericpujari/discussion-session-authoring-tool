@@ -593,8 +593,27 @@
   }
   .inbox-filter-date-label{display:flex; align-items:center; gap:8px; color:#C7D2DD; font-size:12.5px; font-weight:600;}
   .inbox-filter-sep{color:#7C8CA0;}
+  .inbox-stage-filter{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:-10px 0 22px; padding:0 2px;
+  }
+  .inbox-stage-filter-label{color:#7C8CA0; font-size:12px; font-weight:600; text-transform:uppercase; letter-spacing:.03em;}
+  .inbox-stage-chip{
+    display:flex; align-items:center; gap:5px; padding:5px 10px; border-radius:999px;
+    border:1.5px solid rgba(255,255,255,.16); background:rgba(255,255,255,.04);
+    color:#8A96A6; font-size:12.5px; cursor:pointer; user-select:none;
+  }
+  .inbox-stage-chip.checked{background:rgba(255,255,255,.12); border-color:rgba(255,255,255,.3); color:#fff;}
+  .inbox-stage-chip input{margin:0;}
   .inbox-group{margin-bottom:26px;}
   .inbox-group:last-child{margin-bottom:0;}
+  .inbox-section-divider{border-top:1px solid rgba(255,255,255,.14); margin:28px 0 24px;}
+  .inbox-group-head{
+    color:#fff; font-size:14px; margin-bottom:10px; opacity:.75; cursor:pointer;
+    display:flex; align-items:center; gap:7px; user-select:none;
+  }
+  .inbox-group-head:hover{opacity:1;}
+  .inbox-group-arrow{display:inline-flex; align-items:center; color:#fff; transition:transform .15s ease;}
+  .inbox-group-arrow.collapsed{transform:rotate(-90deg);}
   .inbox-row{
     background:var(--paper); border-radius:12px; padding:16px 18px; display:flex; align-items:center; justify-content:space-between;
     box-shadow:var(--shadow-sm); margin-bottom:10px; cursor:pointer; border-left:5px solid var(--lane-b);
@@ -964,11 +983,11 @@ var state = {
   ppStep: 0,                 // player-preview: index into PP_SEQUENCE (scenarios + halftime + reflection, in session order)
   ppChallengeIndex: 0,       // player-preview: which challenge question is showing (scenario steps only)
   ppReturnScreen: 'scenario', // player-preview: screen to return to on exit
-  iconSearchOpen: null,      // {scenarioIndex, optionIndex} while an option's inline search strip is showing
+  iconSearchOpen: null,      // {mode:'draft'|'pending', scenarioIndex, optionIndex} while an option's inline search strip is showing — mode picks state.draft vs state.pendingDraft as the target
   iconSearchResults: [],
   iconSearchLoading: false,
   iconSearchError: '',
-  iconEmbedPending: null,   // {scenarioIndex, optionIndex} while a clicked result is being embedded
+  iconEmbedPending: null,   // {mode, scenarioIndex, optionIndex} while a clicked result is being embedded
   iconEmbedError: '',
   submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
   feedbackSending: false, feedbackSent: false, feedbackError: '',  // beta-test feedback tool — see FEEDBACK_ENABLED
@@ -2511,14 +2530,18 @@ function renderStoryboard(){
 }
 
 /* ---------- Scenario editor ---------- */
-function iconGlyphHtml(o, scenarioIdx, optionIdx){
+// mode distinguishes the student's own draft (default) from a coach polishing a
+// pending: record — see the ICON SEARCH section below for how state.iconSearchOpen
+// carries mode alongside scenario/option index so the two screens' pickers don't
+// collide when a coach has a student draft open in another tab.
+function iconGlyphHtml(o, scenarioIdx, optionIdx, mode, locked){
   if(!o.selectedIcon) return ICON_PLACEHOLDER_SVG;
-  return '<img class="icon-desc-thumb" src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'+
-    '<button type="button" class="icon-desc-clear" data-action="clearIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Remove icon">✕</button>';
+  var clearBtn = locked ? '' : '<button type="button" class="icon-desc-clear" data-action="clearIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" data-mode="'+(mode||'draft')+'" title="Remove icon">✕</button>';
+  return '<img class="icon-desc-thumb" src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'+clearBtn;
 }
-function iconSearchBtnHtml(scenarioIdx, optionIdx){
+function iconSearchBtnHtml(scenarioIdx, optionIdx, mode){
   if(!ICON_SEARCH_ENABLED) return '';
-  var attrs = 'data-action="searchIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" title="Search real icons on the Noun Project"';
+  var attrs = 'data-action="searchIcon" data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" data-mode="'+(mode||'draft')+'" title="Search real icons on the Noun Project"';
   return '<button type="button" class="btn-icon-search" '+attrs+'>Search</button>';
 }
 function renderScenario(){
@@ -2818,6 +2841,33 @@ function renderReviewPreview(d, opts){
     reflectionBlock+
   '</div>';
 }
+// Coach-only UI prefs (which inbox subsections are collapsed, which pipeline stages
+// are checked in the filter bar) — kept in localStorage rather than on a draft/pending
+// record since they describe how one coach's browser likes to view the inbox, not
+// anything about the sessions themselves. Falls back to an in-memory default whenever
+// localStorage throws (private browsing, blocked site data, etc.).
+var INBOX_COLLAPSE_KEY = 'coachInboxCollapsedGroups';
+var INBOX_STAGE_FILTER_KEY = 'coachInboxStageFilter';
+var INBOX_STAGES = ['submitted', 'revision', 'draft', 'pending', 'ready', 'shipped'];
+var INBOX_STAGE_LABELS = {
+  submitted: 'Ready for review', revision: 'Needs revision', draft: 'In progress',
+  pending: 'Pending polish', ready: 'Ready for Code', shipped: 'Shipped'
+};
+function loadInboxPref(key, fallback){
+  try {
+    var raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch(e){ return fallback; }
+}
+function saveInboxPref(key, value){
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch(e){}
+}
+var inboxCollapsedGroups = loadInboxPref(INBOX_COLLAPSE_KEY, {});
+// Every stage checked except 'draft' (In progress) — the one expected to pile up
+// fastest, per Eric: "I imagine there will be hundreds fairly quickly."
+var inboxStageFilter = loadInboxPref(INBOX_STAGE_FILTER_KEY, {
+  submitted:true, revision:true, draft:false, pending:true, ready:true, shipped:true
+});
 // One emoji per pipeline stage, shared by the coach inbox's group headings, every
 // status badge (via statusMeta below), and the student's own inbox on the home screen —
 // same visual language on both sides of the review, not a separate scheme each.
@@ -2894,40 +2944,48 @@ function renderReview(){
     '<div class="review-actions">'+
       (AI_ASSISTANT_ENABLED? '<button class="btn btn-ghost" data-action="askCoachWhole">💬 Ask my assistant to review everything</button>' : '')+
       (d.isExample || accepted? '' : '<button class="btn btn-primary" data-action="submitToCoach">Submit to my coach</button>')+
-      '<button class="btn btn-ghost" data-action="exportMarkdown">⬇ Download as Markdown</button>'+
+      (d.isExample? '' : '<button class="btn btn-ghost" data-action="exportMarkdown">⬇ Download as Markdown</button>')+
     '</div>'+
-    (d.isExample? '<div class="hint" style="margin-top:12px;">This is an example, so there\'s nothing to send. Head home to start a session of your own — you can still download this one to keep.</div>' : '')+
+    (d.isExample? '<div class="hint" style="margin-top:12px;">This is an example, so there\'s nothing to send or download. Head home to start a session of your own.</div>' : '')+
   '</div>';
 }
 
 /* ============================= COACH INBOX (for the human coach) ============================= */
 // One row's markup — pulled out so the three priority groups below render
 // identically instead of three copies of the same template drifting apart.
+// No Download-as-Markdown button here — that's only offered once a session has been
+// accepted (Pending polish / Ready for Code / Shipped, via renderPendingRow), not while
+// it's still in the student/coach back-and-forth.
 function renderInboxRow(d){
   var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.full;
   return ''+
   '<div class="inbox-row" data-action="openInboxDraft" data-id="'+esc(d.id)+'">'+
     '<div class="ir-left"><h4>'+esc(d.title||'Untitled')+' — <span style="font-weight:400;">'+esc(d.studentName)+'</span></h4><p>CODE '+esc(d.id)+' · updated '+timeAgo(d.updatedAt)+'</p></div>'+
-    '<div style="display:flex; align-items:center; gap:10px;">'+
-      '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'" title="Download as Markdown">⬇ Markdown</button>'+
-      '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
-    '</div>'+
+    '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
   '</div>';
 }
 // A submitted draft is the only one waiting on the coach to do anything, so it leads;
 // a still-drafting one has no action pending yet; a reviewed one is done. Each group
 // keeps listAllDrafts' existing most-recently-updated-first order. rowFn defaults to
-// renderInboxRow (draft: records); the Pending/Past-sessions groups pass renderPendingRow
+// renderInboxRow (draft: records); the Pending/Finalized groups pass renderPendingRow
 // instead, since those rows come from pending: records with a different shape.
-function renderInboxGroup(label, list, rowFn){
+// groupKey is the stable id (see INBOX_STAGES) collapse state is saved under —
+// separate from `label`, which carries an emoji and can't double as a storage key.
+// A Unicode ▾ renders as a barely-visible sliver at this size in most UI fonts —
+// an inline SVG chevron stays crisp and rotates cleanly for the collapsed state.
+var INBOX_CHEVRON_SVG = '<svg viewBox="0 0 12 8" width="10" height="7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 1.5l5 5 5-5"/></svg>';
+function renderInboxGroup(label, list, rowFn, groupKey){
   if(!list.length) return '';
+  var collapsed = !!(groupKey && inboxCollapsedGroups[groupKey]);
   return '<div class="inbox-group">'+
-    '<h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+esc(label)+' ('+list.length+')</h3>'+
-    list.map(rowFn || renderInboxRow).join('')+
+    '<h3 class="inbox-group-head" data-action="toggleInboxGroup" data-groupkey="'+esc(groupKey||'')+'">'+
+      '<span class="inbox-group-arrow'+(collapsed?' collapsed':'')+'">'+INBOX_CHEVRON_SVG+'</span>'+esc(label)+' ('+list.length+')'+
+    '</h3>'+
+    (collapsed ? '' : list.map(rowFn || renderInboxRow).join(''))+
   '</div>';
 }
 // Coach inbox search/filter — applied to both draft: and pending: records before they're
-// split into groups, so a search narrows every group (and Past sessions) consistently.
+// split into groups, so a search narrows every group (and Finalized) consistently.
 // "Date submitted" reads submittedAt on either record type (see newPendingFromDraft,
 // which carries it over) rather than updatedAt, which drifts every time anyone — coach
 // or student — touches the record again.
@@ -2968,30 +3026,36 @@ function renderPendingRow(p){
   return ''+
   '<div class="inbox-row" data-action="openPendingDraft" data-id="'+esc(p.id)+'">'+
     '<div class="ir-left"><h4>'+esc(p.title||'Untitled')+' — <span style="font-weight:400;">'+esc(p.studentName)+'</span></h4><p>CODE '+esc(p.id)+' · '+esc(statusLine)+'</p></div>'+
-    '<span class="status-badge '+badgeCls+'">'+badgeLabel+'</span>'+
+    '<div style="display:flex; align-items:center; gap:10px;">'+
+      '<button class="btn btn-ghost btn-small" data-action="exportMarkdownPending" data-id="'+esc(p.id)+'" title="Download as Markdown">⬇ Markdown</button>'+
+      '<span class="status-badge '+badgeCls+'">'+badgeLabel+'</span>'+
+    '</div>'+
   '</div>';
 }
 function renderShellInbox(){
   var filteredDrafts = state.inboxList.filter(matchesInboxFilter);
   var filteredPending = state.pendingList.filter(matchesInboxFilter);
-  var submitted = filteredDrafts.filter(function(d){ return d.status==='submitted'; });
-  var needsRevision = filteredDrafts.filter(function(d){ return d.status==='revision'; });
-  var inProgress = filteredDrafts.filter(function(d){ return d.status==='draft'; });
+  // Each array is emptied outright when its stage is unchecked in the filter bar
+  // (inboxStageFilter) rather than just visually hidden — see renderInboxFilterBar.
+  var submitted = inboxStageFilter.submitted ? filteredDrafts.filter(function(d){ return d.status==='submitted'; }) : [];
+  var needsRevision = inboxStageFilter.revision ? filteredDrafts.filter(function(d){ return d.status==='revision'; }) : [];
+  var inProgress = inboxStageFilter.draft ? filteredDrafts.filter(function(d){ return d.status==='draft'; }) : [];
   // 'reviewed' drafts don't get their own group any more — loadInbox migrates every one
   // into a real pending: record (see migrateReviewedDrafts) before this ever renders, so
   // by the time a coach sees the inbox they've already folded into Pending polish below.
-  var pendingRows = filteredPending.filter(function(p){ return p.status==='pending'; });
-  var readyRows = filteredPending.filter(function(p){ return p.status==='ready'; });
-  var shippedRows = filteredPending.filter(function(p){ return p.status==='shipped'; });
+  var pendingRows = inboxStageFilter.pending ? filteredPending.filter(function(p){ return p.status==='pending'; }) : [];
+  var readyRows = inboxStageFilter.ready ? filteredPending.filter(function(p){ return p.status==='ready'; }) : [];
+  var shippedRows = inboxStageFilter.shipped ? filteredPending.filter(function(p){ return p.status==='shipped'; }) : [];
   var hasAnyData = state.inboxList.length || state.pendingList.length;
   var hasFilteredRows = submitted.length || needsRevision.length || inProgress.length || pendingRows.length || readyRows.length || shippedRows.length;
   var rows = hasAnyData ? (
     hasFilteredRows ? (
-      renderInboxGroup(STAGE_EMOJI.submitted+' Ready for review', submitted)+
-      renderInboxGroup(STAGE_EMOJI.revision+' Needs revision', needsRevision)+
-      renderInboxGroup(STAGE_EMOJI.draft+' In progress', inProgress)+
-      renderInboxGroup(STAGE_EMOJI.pending+' Pending polish', pendingRows, renderPendingRow)
-    ) : '<div class="empty-state">No drafts match this search.</div>'
+      renderInboxGroup(STAGE_EMOJI.submitted+' Ready for review', submitted, null, 'submitted')+
+      renderInboxGroup(STAGE_EMOJI.revision+' Needs revision', needsRevision, null, 'revision')+
+      renderInboxGroup(STAGE_EMOJI.draft+' In progress', inProgress, null, 'draft')+
+      (pendingRows.length ? '<div class="inbox-section-divider"></div>' : '')+
+      renderInboxGroup(STAGE_EMOJI.pending+' Pending polish', pendingRows, renderPendingRow, 'pending')
+    ) : '<div class="empty-state">No drafts match this search or filter.</div>'
   ) : (state.inboxLoading
     ? '<div class="empty-state">Loading drafts…</div>'
     : (state.inboxError
@@ -3001,16 +3065,11 @@ function renderShellInbox(){
   // coach. Split in two: done polishing and waiting to actually ship, versus already
   // sent (where the only ongoing task is logging reuse — see the usage-weeks panel).
   var pastSection = (readyRows.length || shippedRows.length) ? (
+    '<div class="inbox-section-divider"></div>'+
     '<div style="margin-top:34px;">'+
-      '<h3 style="color:#fff; font-size:16px; margin-bottom:6px;">📚 Past sessions</h3>'+
-      (readyRows.length ? (
-        '<div class="inbox-group"><h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+STAGE_EMOJI.ready+' Ready for Code ('+readyRows.length+')</h3>'+
-        readyRows.map(renderPendingRow).join('')+'</div>'
-      ) : '')+
-      (shippedRows.length ? (
-        '<div class="inbox-group"><h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+STAGE_EMOJI.shipped+' Shipped ('+shippedRows.length+')</h3>'+
-        shippedRows.map(renderPendingRow).join('')+'</div>'
-      ) : '')+
+      '<h3 style="color:#fff; font-size:16px; margin-bottom:6px;">📚 Finalized</h3>'+
+      renderInboxGroup(STAGE_EMOJI.ready+' Ready for Code', readyRows, renderPendingRow, 'ready')+
+      renderInboxGroup(STAGE_EMOJI.shipped+' Shipped', shippedRows, renderPendingRow, 'shipped')+
     '</div>'
   ) : '';
   var errorBanner = state.inboxError ? '<div class="banner">⚠️ '+esc(state.inboxError)+'</div>' : '';
@@ -3046,6 +3105,16 @@ function renderShellInbox(){
       '<span class="inbox-filter-sep">–</span>'+
       '<input type="date" id="inboxDateToInput" value="'+esc(state.inboxDateTo)+'" title="Submitted to">'+
       ((state.inboxSearch || state.inboxDateFrom || state.inboxDateTo) ? '<button type="button" class="btn btn-ghost-light btn-small" data-action="clearInboxFilter">Clear</button>' : '')+
+    '</div>'+
+    '<div class="inbox-stage-filter">'+
+      '<span class="inbox-stage-filter-label">Show:</span>'+
+      INBOX_STAGES.map(function(stageKey){
+        var checked = !!inboxStageFilter[stageKey];
+        return '<label class="inbox-stage-chip'+(checked?' checked':'')+'">'+
+          '<input type="checkbox" data-action="toggleInboxStage" data-stage="'+stageKey+'"'+(checked?' checked':'')+'>'+
+          esc(STAGE_EMOJI[stageKey])+' '+esc(INBOX_STAGE_LABELS[stageKey])+
+        '</label>';
+      }).join('')+
     '</div>'+
     errorBanner+
     flaggedSection+
@@ -3121,7 +3190,6 @@ function renderShellInboxDraft(){
     '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
     '<div style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">'+
       '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
-      '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'">⬇ Download as Markdown</button>'+
     '</div>'+
     renderReviewPreview(d, {coachNotes:true})+
     (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
@@ -3175,7 +3243,12 @@ function renderPendingScreen(){
       '<div class="pending-option" style="--c:'+lane.color+'; --soft:'+lane.soft+'">'+
         '<div class="field"><label>Option '+(oi+1)+' label</label><input type="text" data-pbind="optLabel" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="60" value="'+esc(o.label)+'"'+(locked?' disabled':'')+'></div>'+
         '<div class="field"><label>Why</label><textarea data-pbind="optRationale" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="400"'+(locked?' disabled':'')+'>'+esc(o.rationale)+'</textarea></div>'+
-        '<div class="field"><label>Icon idea</label><input type="text" data-pbind="optIcon" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="80" value="'+esc(o.iconDescription)+'"'+(locked?' disabled':'')+'></div>'+
+        '<div class="field"><label>Icon</label><div class="icon-desc-box"><span class="icon-desc-glyph">'+iconGlyphHtml(o, i, oi, 'pending', locked)+'</span>'+
+          '<input type="text" data-pbind="optIcon" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="80" value="'+esc(o.iconDescription)+'" placeholder="Search for an image"'+(locked?' disabled':'')+'>'+
+          (locked? '' : iconSearchBtnHtml(i, oi, 'pending'))+
+        '</div>'+
+        (locked? '' : iconSearchStripHtml(o, i, oi, 'pending'))+
+        '</div>'+
       '</div>';
     }).join('');
     var chHtml = sc.challenge.map(function(q, qi){
@@ -3228,6 +3301,7 @@ function renderPendingScreen(){
     '<div style="margin-bottom:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">'+
       '<span class="status-badge '+statusBadgeCls+'">'+statusBadgeLabel+'</span>'+
       (locked? '' : '<span id="pendingSaveIndicator" class="rail-save-indicator '+pendingSaveStatus+'">'+saveStatusText(pendingSaveStatus)+'</span>')+
+      '<button class="btn btn-ghost btn-small" data-action="exportMarkdownPending" data-id="'+esc(p.id)+'">⬇ Download as Markdown</button>'+
     '</div>'+
     '<div class="page-head"><h2>'+esc(p.title||'Untitled')+' <span style="font-weight:400; font-size:16px; color:var(--ink-soft);">— '+esc(p.studentName)+'</span></h2></div>'+
     (p.bigIdea ? ('<div class="panel" style="background:#F0EBDA;"><h3>Original overall idea <span class="hint-inline">(the student\'s brainstorm — reference only, not part of the session)</span></h3><p style="font-size:13.5px; line-height:1.5; white-space:pre-wrap;">'+esc(p.bigIdea)+'</p></div>') : '')+
@@ -3646,8 +3720,8 @@ function performIconSearch(query){
 // Fetches the chosen icon's bytes (embedded as a data: URI by api/icon-asset.js)
 // and only then writes selectedIcon — never the raw search result, which still
 // carries Noun Project's own, soon-to-expire thumbnailUrl/iconUrl.
-function embedSelectedIcon(icon, scenarioIndex, optionIndex){
-  state.iconEmbedPending = {scenarioIndex:scenarioIndex, optionIndex:optionIndex};
+function embedSelectedIcon(icon, scenarioIndex, optionIndex, mode){
+  state.iconEmbedPending = {mode:mode||'draft', scenarioIndex:scenarioIndex, optionIndex:optionIndex};
   state.iconEmbedError = '';
   render();
   fetch(ICON_EMBED_ENDPOINT+'?id='+encodeURIComponent(icon.id))
@@ -3661,7 +3735,8 @@ function embedSelectedIcon(icon, scenarioIndex, optionIndex){
       state.iconEmbedPending = null;
       // The scenario/option this was for may no longer exist — e.g. the option
       // count shrank while this request was in flight.
-      var sc = state.draft && state.draft.scenarios[scenarioIndex];
+      var source = mode==='pending' ? state.pendingDraft : state.draft;
+      var sc = source && source.scenarios[scenarioIndex];
       var opt = sc && sc.options[optionIndex];
       if(opt){
         opt.selectedIcon = {
@@ -3672,7 +3747,7 @@ function embedSelectedIcon(icon, scenarioIndex, optionIndex){
           attributionUrl: data.attributionUrl || icon.attributionUrl || null
         };
         state.iconSearchOpen = null;
-        debounceSave();
+        if(mode==='pending') debouncePendingSave(); else debounceSave();
       }
       render();
     })
@@ -3684,11 +3759,11 @@ function embedSelectedIcon(icon, scenarioIndex, optionIndex){
       render();
     });
 }
-function iconSearchStripHtml(o, scenarioIdx, optionIdx){
+function iconSearchStripHtml(o, scenarioIdx, optionIdx, mode){
   var loc = state.iconSearchOpen;
-  if(!loc || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
+  if(!loc || loc.mode!==(mode||'draft') || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
   var pending = state.iconEmbedPending;
-  var isEmbedding = !!(pending && pending.scenarioIndex===scenarioIdx && pending.optionIndex===optionIdx);
+  var isEmbedding = !!(pending && pending.mode===(mode||'draft') && pending.scenarioIndex===scenarioIdx && pending.optionIndex===optionIdx);
   var resultsHtml = state.iconSearchResults.map(function(icon, idx){
     var selected = o.selectedIcon && o.selectedIcon.id===icon.id;
     return '<button type="button" class="icon-search-result'+(selected?' selected':'')+'" data-action="selectIcon" data-idx="'+idx+'" title="'+esc(icon.attributionName||'Noun Project icon')+'"><img src="'+esc(icon.thumbnailUrl)+'" alt=""></button>';
@@ -4013,6 +4088,17 @@ function attachGlobalHandlers(){
       debouncePendingSave();
     });
   });
+  // icon search: Enter runs the search, same as clicking the Search button — mirrors
+  // the data-bind wiring above for the student's own iconDescription field.
+  app.querySelectorAll('input[data-pbind="optIcon"]').forEach(function(el){
+    el.addEventListener('keydown', function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        var btn = el.parentElement.querySelector('[data-action="searchIcon"]');
+        if(btn) btn.click();
+      }
+    });
+  });
   // Live "doesn't close with the standard line yet" warning on the parent blurb —
   // a targeted toggle rather than a full render(), so typing doesn't lose the cursor.
   var blurbEl = document.getElementById('pendingParentBlurbInput');
@@ -4274,6 +4360,22 @@ function handleClick(e){
   }
   if(action==='clearInboxFilter'){
     state.inboxSearch=''; state.inboxDateFrom=''; state.inboxDateTo='';
+    render();
+    return;
+  }
+  if(action==='toggleInboxGroup'){
+    var toggleGroupKey = t.getAttribute('data-groupkey');
+    if(!toggleGroupKey) return;
+    inboxCollapsedGroups[toggleGroupKey] = !inboxCollapsedGroups[toggleGroupKey];
+    saveInboxPref(INBOX_COLLAPSE_KEY, inboxCollapsedGroups);
+    render();
+    return;
+  }
+  if(action==='toggleInboxStage'){
+    var stageKey = t.getAttribute('data-stage');
+    if(!stageKey) return;
+    inboxStageFilter[stageKey] = !inboxStageFilter[stageKey];
+    saveInboxPref(INBOX_STAGE_FILTER_KEY, inboxStageFilter);
     render();
     return;
   }
@@ -4547,10 +4649,16 @@ function handleClick(e){
     return;
   }
 
-  if(action==='exportMarkdownInbox'){
-    var exportId = t.getAttribute('data-id');
-    var exportDraft = state.inboxList.filter(function(x){return x.id===exportId;})[0];
-    if(exportDraft) downloadText((exportDraft.title||'session').toLowerCase().replace(/[^a-z0-9]+/g,'_')+'.md', toMarkdown(exportDraft));
+  // Only offered once a session is past the student/coach back-and-forth (Pending
+  // polish / Ready for Code / Shipped) — see renderPendingRow/renderPendingScreen.
+  // Draft-status records (Ready for review, Needs revision, In progress) never render
+  // this button.
+  if(action==='exportMarkdownPending'){
+    var exportPendingId = t.getAttribute('data-id');
+    var exportPending = (state.pendingDraft && state.pendingDraft.id===exportPendingId)
+      ? state.pendingDraft
+      : state.pendingList.filter(function(x){return x.id===exportPendingId;})[0];
+    if(exportPending) downloadText((exportPending.title||'session').toLowerCase().replace(/[^a-z0-9]+/g,'_')+'.md', toMarkdown(exportPending));
     return;
   }
 
@@ -4625,7 +4733,7 @@ function handleClick(e){
   }
   if(action==='markSentToCode'){
     if(!state.pendingDraft) return;
-    if(!window.confirm('Mark this session as sent to code? It will move to Shipped, under Past sessions.')) return;
+    if(!window.confirm('Mark this session as sent to code? It will move to Shipped, under Finalized.')) return;
     state.pendingDraft.status = 'shipped';
     state.pendingDraft.sentToCodeAt = Date.now();
     savePendingDraft().then(function(){ render(); });
@@ -4633,7 +4741,7 @@ function handleClick(e){
   }
 
   // Both player-preview actions live here, above the "requires a loaded draft" guard
-  // below — exactly like exportMarkdownInbox just above, since the coach inbox never
+  // below — exactly like exportMarkdownPending just above, since the coach inbox never
   // sets state.draft at all (renderShellInboxDraft reads state.inboxList directly on
   // every render). Placed after that guard, a coach's click here used to be silently
   // swallowed before either handler ever ran.
@@ -4661,7 +4769,10 @@ function handleClick(e){
     render(); return;
   }
 
-  if(!state.draft) return; // remaining actions require a loaded draft
+  // Icon search/select/clear can fire from the coach's pending-polish screen, which
+  // has no state.draft loaded — only searchIcon/selectIcon/clearIcon (all mode-aware,
+  // below) run in that case, so the gate has to admit either record type.
+  if(!state.draft && !state.pendingDraft) return;
 
   if(action==='nav'){
     var navTarget = t.getAttribute('data-target');
@@ -4678,9 +4789,12 @@ function handleClick(e){
   if(action==='searchIcon'){
     var scenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
     var optionIdx = parseInt(t.getAttribute('data-oidx'),10);
-    var query = state.draft.scenarios[scenarioIdx].options[optionIdx].iconDescription.trim();
+    var searchMode = t.getAttribute('data-mode') || 'draft';
+    var searchSource = searchMode==='pending' ? state.pendingDraft : state.draft;
+    if(!searchSource) return;
+    var query = searchSource.scenarios[scenarioIdx].options[optionIdx].iconDescription.trim();
     if(!query) return;
-    state.iconSearchOpen = {scenarioIndex:scenarioIdx, optionIndex:optionIdx};
+    state.iconSearchOpen = {mode:searchMode, scenarioIndex:scenarioIdx, optionIndex:optionIdx};
     state.iconEmbedError = '';
     performIconSearch(query);
     return;
@@ -4691,14 +4805,21 @@ function handleClick(e){
     var icon = state.iconSearchResults[iconIdx];
     if(!icon || !state.iconSearchOpen) return;
     var loc = state.iconSearchOpen;
-    embedSelectedIcon(icon, loc.scenarioIndex, loc.optionIndex);
+    embedSelectedIcon(icon, loc.scenarioIndex, loc.optionIndex, loc.mode);
     return;
   }
   if(action==='clearIcon'){
     var clearScenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
     var clearOptionIdx = parseInt(t.getAttribute('data-oidx'),10);
-    state.draft.scenarios[clearScenarioIdx].options[clearOptionIdx].selectedIcon = null;
-    debounceSave();
+    var clearMode = t.getAttribute('data-mode') || 'draft';
+    if(clearMode==='pending'){
+      if(!state.pendingDraft || state.pendingDraft.status==='ready' || state.pendingDraft.status==='shipped') return;
+      state.pendingDraft.scenarios[clearScenarioIdx].options[clearOptionIdx].selectedIcon = null;
+      debouncePendingSave();
+    } else {
+      state.draft.scenarios[clearScenarioIdx].options[clearOptionIdx].selectedIcon = null;
+      debounceSave();
+    }
     render();
     return;
   }
@@ -4792,6 +4913,7 @@ function handleClick(e){
     return;
   }
   if(action==='exportMarkdown'){
+    if(state.draft.isExample) return; // the button is hidden for examples; this is the backstop
     downloadText((state.draft.title||'session').toLowerCase().replace(/[^a-z0-9]+/g,'_')+'.md', toMarkdown(state.draft));
     return;
   }
