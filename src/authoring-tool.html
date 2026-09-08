@@ -96,7 +96,7 @@
   .btn-danger-text{color:#9B3B34; background:transparent; border:none; font-size:13px; font-weight:600;}
 
   /* ---------- Home ---------- */
-  .home-wrap{max-width:1140px; margin:0 auto; padding:64px 24px 80px;}
+  .home-wrap{max-width:none; margin:0; padding:64px clamp(24px, 6vw, 120px) 80px;}
   /* Coach review page: no max-width cap, just a sticky-note's worth of gutter on each
      side (STICKY_W = 170px in JS, kept in sync here) so the card grows with the window. */
   .inbox-draft-wrap{max-width:none; margin:0; padding:44px 190px 80px;}
@@ -132,6 +132,7 @@
   .field .hint{font-size:12px; color:#8B94A0; margin-top:5px; font-weight:400; text-transform:none; letter-spacing:0;}
   .home-footer-link{display:block; text-align:center; margin-top:36px; color:#C7D2DD; font-size:13.5px; text-decoration:underline; text-underline-offset:3px;}
   .home-footer-link:hover{color:#fff;}
+  .student-inbox-heading{font-size:13px; font-weight:700; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.04em; margin:18px 0 4px;}
   .resume-matches{display:flex; flex-direction:column; gap:8px; margin-top:14px;}
   .resume-match-row{
     background:#fff; border:1.5px solid var(--line); border-radius:10px; padding:10px 14px; cursor:pointer;
@@ -186,7 +187,7 @@
   .rail-save-indicator.failed{color:#E08A7D; font-weight:600;}
   .rail-save-indicator.failedfinal, .rail-save-indicator.toobig{color:#F0776A; font-weight:700;}
 
-  .main{flex:1; min-width:0; padding:34px 40px 120px; max-width:1140px; margin:0 auto;}
+  .main{flex:1; min-width:0; padding:34px clamp(40px, 5vw, 120px) 120px;}
   @media (max-width:860px){
     .shell{flex-direction:column;}
     .rail{width:100%; flex-direction:row; align-items:center; overflow-x:auto; overflow-y:visible; padding:12px 16px; gap:14px; height:auto; top:0;}
@@ -374,16 +375,35 @@
   .p-cqs{font-size:13.5px; line-height:1.9; color:#3c3527;}
   .p-refl{font-size:13.5px; font-style:italic; color:#3c3527;}
   .p-half{padding:18px 0; border-top:2px dashed var(--line);}
+  .p-opt-content{flex:1; min-width:0;}
+  .p-opt-notes{flex:0 0 240px; max-width:240px;}
+  .p-opt-note-slot{margin-bottom:8px;}
+  .p-opt-note-slot:last-child{margin-bottom:0;}
+  @media (max-width:760px){
+    .p-opt{flex-wrap:wrap;}
+    .p-opt-notes{flex:1 1 100%; max-width:none; margin-top:8px;}
+  }
 
   /* ---------- Coach editor's notes (per-field, review preview) ---------- */
   .field-notes{margin:6px 0 4px;}
+  /* Notes sit in line with their content, to the right, instead of stacked underneath —
+     see withNote. Collapses to stacked below a breakpoint, since a side column that
+     narrow stops being legible. */
+  .field-with-note{display:flex; gap:16px; align-items:flex-start; margin-bottom:2px;}
+  .field-with-note-content{flex:1; min-width:0;}
+  .field-with-note-side{flex:0 0 260px; max-width:260px;}
+  @media (max-width:760px){
+    .field-with-note{flex-direction:column; gap:6px;}
+    .field-with-note-side{flex:none; max-width:none; width:100%;}
+  }
+  .field-note-slot-label{font-family:var(--font-mono); font-size:9.5px; text-transform:uppercase; letter-spacing:.05em; color:#B0A583; margin-bottom:3px;}
   .field-note{background:#FBEAE7; border:1px solid #E8C3BC; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12.5px; line-height:1.5;}
   .field-note-text{color:#7A342A;}
   .field-note-meta{font-family:var(--font-mono); font-size:10.5px; color:#9B6459; margin-top:4px;}
   .field-note-done{display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;}
-  .field-note-add-btn{font-size:11.5px; font-weight:600; color:var(--lane-a); background:none; border:none; padding:2px 0; cursor:pointer; margin-bottom:6px;}
+  .field-note-add-btn{font-size:11.5px; font-weight:700; color:#C0463A; background:none; border:none; padding:2px 0; cursor:pointer; margin-bottom:6px;}
   .field-note-add-btn:hover{text-decoration:underline;}
-  .field-note-compose{background:#fff; border:1.5px solid var(--line); border-radius:9px; padding:10px; margin-bottom:8px;}
+  .field-note-compose{background:#fff; border:2px solid #C0463A; border-radius:9px; padding:10px; margin-bottom:8px; box-shadow:0 0 0 3px rgba(192,70,58,.12);}
   .field-note-compose-label{font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#9B8F6E; margin-bottom:6px;}
   .field-note-compose textarea{width:100%; min-height:60px; border:none; font-family:var(--font-body); font-size:13px; resize:vertical;}
   .field-note-compose textarea:focus{outline:none;}
@@ -1302,11 +1322,17 @@ function buildExampleDraft(key){
     status: 'draft',
     title: src.title, bigIdea: src.bigIdea,
     optionCount: src.optionCount,
-    scenarios: src.scenarios.map(function(sc){
+    // Deterministic, not uid() — ensureExampleDraftsSeeded rebuilds this fresh (title,
+    // scenario text, icons, whatever EXAMPLE_SESSIONS says now) on every coach inbox
+    // load, replacing scenarios/options wholesale each time. A random id here would
+    // silently orphan anything keyed to a specific scenario/option, like the pipeline
+    // demo's editor's note (see buildPipelineExampleDraft) — it'd point at an id that
+    // no longer exists by the very next reload.
+    scenarios: src.scenarios.map(function(sc, i){
       return {
-        id: uid(), title: sc.title, domain: sc.domain, setup: sc.setup,
+        id: key+'-sc'+i, title: sc.title, domain: sc.domain, setup: sc.setup,
         options: sc.options.map(function(o, oi){
-          return {id:uid(), label:o.label, rationale:o.rationale, iconDescription:o.iconDescription, selectedIcon:o.selectedIcon||null, colorIndex:oi};
+          return {id:key+'-sc'+i+'-opt'+oi, label:o.label, rationale:o.rationale, iconDescription:o.iconDescription, selectedIcon:o.selectedIcon||null, colorIndex:oi};
         }),
         challenge: sc.challenge.slice(),
         reflection: sc.reflection
@@ -1720,6 +1746,22 @@ function listDraftsForUser(username){
   });
 }
 
+// A student's own draft record never says more than 'accepted' — the finer-grained
+// pending/shipped stage lives on the separate pending:<id> record their coach owns
+// (see studentStageMeta). Kept in its own id-keyed map rather than stamped onto the
+// draft objects themselves: renameResumeDraft round-trips a resumeMatches entry
+// straight back through JSON.stringify, and a client-only field living on that object
+// would otherwise get silently written into the saved draft record.
+var resumeStageById = {};
+// Runs after the inbox has already rendered with what's known, so the common case (no
+// accepted drafts) never waits on it.
+function enrichMatchesWithStage(matches){
+  var accepted = matches.filter(function(d){ return d.status==='accepted'; });
+  if(!accepted.length) return;
+  Promise.all(accepted.map(function(d){
+    return loadPending(d.id).then(function(p){ resumeStageById[d.id] = p ? p.status : null; }).catch(function(){ resumeStageById[d.id] = null; });
+  })).then(function(){ render(); });
+}
 // With links on, identity comes from the token, so the drafts list can just load
 // itself whenever the student lands on the home screen — no username to type, and
 // nothing to press.
@@ -1727,8 +1769,10 @@ function refreshMyDrafts(){
   if(!window.storage.hasStudentToken()) return;
   if(!hasStorage){ state.homeError='Saving isn\'t available in this preview, so sessions can\'t be resumed.'; render(); return; }
   state.resumeLoading = true; state.homeError = ''; render();
+  resumeStageById = {};
   listDraftsForUser(window.storage.studentUsername()).then(function(matches){
     state.resumeLoading = false; state.resumeMatches = matches; render();
+    enrichMatchesWithStage(matches);
   }).catch(function(e){
     state.resumeLoading = false;
     if(e && e.studentAuthRequired){ studentLinkExpired(); return; }
@@ -1750,8 +1794,98 @@ function studentLinkExpired(){
 // Fixed ids (not host genCode() output) so re-checking "does this already exist" is
 // idempotent across reloads/coaches, instead of reseeding a fresh copy every time.
 var EXAMPLE_INBOX_IDS = {heartMindGut: 'EXAMPLE-HMG', askOrGuess: 'EXAMPLE-AOG'};
+// One "Ask or Guess?" draft frozen at each of the other stages, so the coach inbox always
+// has a worked example of the whole pipeline rather than only ever showing "Ready for
+// review" — see buildPipelineExampleDraft. EXAMPLE-AOG itself already covers submitted.
+var EXAMPLE_PIPELINE_IDS = {revision:'EXAMPLE-AOG-REV', pending:'EXAMPLE-AOG-PEND', shipped:'EXAMPLE-AOG-SHIP'};
 function isSeededExampleId(id){
-  return id==='EXAMPLE-HMG' || id==='EXAMPLE-AOG';
+  return id==='EXAMPLE-HMG' || id==='EXAMPLE-AOG' ||
+    id===EXAMPLE_PIPELINE_IDS.revision || id===EXAMPLE_PIPELINE_IDS.pending || id===EXAMPLE_PIPELINE_IDS.shipped;
+}
+// Builds one pipeline-stage demo from the same "Ask or Guess?" content as EXAMPLE-AOG.
+// 'revision' stops at a draft: record with a coach note and one inline editor's note
+// (on scenario 0's second option — see the deterministic ids buildExampleDraft now
+// uses, without which this note would point at a scenario id that stops existing on
+// the next reseed). 'pending' and 'shipped' mirror what acceptDraft/newPendingFromDraft
+// actually produce: a frozen, accepted draft plus its own pending:<id> record, the
+// parent blurb filled in, and — for 'shipped' — usage weeks and a ship date.
+function buildPipelineExampleDraft(stage){
+  var d = buildExampleDraft('askOrGuess');
+  d.id = EXAMPLE_PIPELINE_IDS[stage];
+  var stageLabel = stage==='revision' ? 'needs revision' : stage==='pending' ? 'pending polish' : 'shipped';
+  d.studentName = 'Example ('+stageLabel+')';
+
+  if(stage==='revision'){
+    d.status = 'revision';
+    d.coachNotes = [{
+      text: 'Loved most of these! A couple of the options could use a small rebalance — see the inline note on the first scenario. Take a look and resubmit whenever you\'re ready.',
+      at: Date.now()
+    }];
+    d.editorNotes = [newEditorNote(
+      'sc:askOrGuess-sc0:opt:askOrGuess-sc0-opt1:rationale',
+      'This reads a little like giving up compared to "Ask directly" — can we give it its own confident, deliberate reason instead of leaning on "not worth the risk"?'
+    )];
+    return {draft:d, pending:null};
+  }
+
+  // 'pending' and 'shipped' both start from an accepted draft.
+  d.status = 'accepted';
+  d.acceptedAt = Date.now();
+  d.coachNotes = [{text:'Really strong set — accepting as-is. Polishing the parent-facing copy now.', at:Date.now()}];
+  var p = newPendingFromDraft(d);
+  p.parentBlurb = 'This week, your kid is exploring the tug-of-war between asking directly for '+
+    'what you need and hoping someone notices without being told — through six everyday '+
+    'moments, from a missed birthday invite to a teammate who\'s gone quiet on a call. '+MANTRA;
+  if(stage==='shipped'){
+    p.status = 'shipped';
+    p.sentToCodeAt = Date.now() - (1000*60*60*24*30); // 30 days ago, so it doesn't read as "just shipped"
+    p.usageWeeks = ['2026-03-02', '2026-06-15'];
+  }
+  return {draft:d, pending:p};
+}
+// Same idempotent-seed-then-preserve-coach-edits shape as the main two examples below,
+// just also covering the paired pending:<id> record for the 'pending'/'shipped' stages.
+function seedPipelineExample(stage){
+  var id = EXAMPLE_PIPELINE_IDS[stage];
+  return window.storage.get('draft:'+id, true).then(function(existingDraft){
+    var built = buildPipelineExampleDraft(stage);
+    var freshDraft = built.draft, freshPending = built.pending;
+    if(!existingDraft){
+      var writes = [window.storage.set('draft:'+id, JSON.stringify(freshDraft), true)];
+      if(freshPending) writes.push(window.storage.set('pending:'+id, JSON.stringify(freshPending), true));
+      return Promise.all(writes);
+    }
+    var old;
+    try { old = JSON.parse(existingDraft.value); } catch(e){ old = null; }
+    if(!old) old = freshDraft;
+    var mergedDraft = Object.assign({}, freshDraft, {
+      status: old.status || freshDraft.status,
+      acceptedAt: old.acceptedAt || freshDraft.acceptedAt,
+      coachNotes: old.coachNotes || freshDraft.coachNotes,
+      editorNotes: old.editorNotes || freshDraft.editorNotes,
+      createdAt: old.createdAt || freshDraft.createdAt,
+      updatedAt: old.updatedAt || freshDraft.updatedAt
+    });
+    var writes2 = [window.storage.set('draft:'+id, JSON.stringify(mergedDraft), true)];
+    if(freshPending){
+      writes2.push(window.storage.get('pending:'+id, true).then(function(existingPending){
+        if(!existingPending) return window.storage.set('pending:'+id, JSON.stringify(freshPending), true);
+        var oldP;
+        try { oldP = JSON.parse(existingPending.value); } catch(e){ oldP = null; }
+        if(!oldP) return window.storage.set('pending:'+id, JSON.stringify(freshPending), true);
+        var mergedPending = Object.assign({}, freshPending, {
+          status: oldP.status || freshPending.status,
+          parentBlurb: oldP.parentBlurb || freshPending.parentBlurb,
+          usageWeeks: oldP.usageWeeks || freshPending.usageWeeks,
+          sentToCodeAt: oldP.sentToCodeAt || freshPending.sentToCodeAt,
+          createdAt: oldP.createdAt || freshPending.createdAt,
+          updatedAt: oldP.updatedAt || freshPending.updatedAt
+        });
+        return window.storage.set('pending:'+id, JSON.stringify(mergedPending), true);
+      }));
+    }
+    return Promise.all(writes2);
+  }).catch(function(){});
 }
 // Makes sure the two example sessions exist as real, persisted drafts so they show up
 // in the coach inbox like any submitted draft — reviewable, notable, markable. Only
@@ -1790,7 +1924,7 @@ function ensureExampleDraftsSeeded(){
       });
       return window.storage.set('draft:'+id, JSON.stringify(merged), true);
     }).catch(function(){});
-  }));
+  }).concat(Object.keys(EXAMPLE_PIPELINE_IDS).map(seedPipelineExample)));
 }
 
 /* ---------- Moderation (per-username, applies across every draft that username builds) ---------- */
@@ -1909,10 +2043,19 @@ function renderHome(){
   var signedIn = window.storage.hasStudentToken();
   var resumeMatchesHtml = '';
   if(state.resumeMatches && state.resumeMatches.length){
-    resumeMatchesHtml = '<div class="resume-matches">'+
+    // "Your inbox": same idea as the coach's, same stage emoji (STAGE_EMOJI) — so a
+    // student can tell at a glance whether something is still theirs to write, waiting
+    // on a coach, sent back with notes, or already accepted and (once known — see
+    // enrichMatchesWithStage) being polished or shipped.
+    resumeMatchesHtml = '<h4 class="student-inbox-heading">📬 Your inbox</h4>'+
+    '<div class="resume-matches">'+
       state.resumeMatches.map(function(d){
+        var stage = studentStageMeta(d);
         return '<div class="resume-match-row with-actions" data-action="openResumeDraft" data-id="'+esc(d.id)+'">'+
-          '<div><h4>'+esc(d.title||'Untitled')+'</h4><p>updated '+timeAgo(d.updatedAt)+'</p></div>'+
+          '<div><h4>'+esc(d.title||'Untitled')+'</h4>'+
+            '<p style="margin:4px 0;"><span class="status-badge '+stage.cls+'">'+stage.full+'</span></p>'+
+            '<p>updated '+timeAgo(d.updatedAt)+'</p>'+
+          '</div>'+
           '<div class="resume-match-actions">'+
             '<button type="button" class="btn-icon" data-action="previewResumeDraft" data-id="'+esc(d.id)+'" title="Preview">🖥️</button>'+
             '<button type="button" class="btn-icon" data-action="renameResumeDraft" data-id="'+esc(d.id)+'" title="Rename">✏️</button>'+
@@ -2496,6 +2639,30 @@ function noteBlockHtml(d, fieldKey, opts){
 
   return '<div class="field-notes">'+notesHtml+controlHtml+'</div>';
 }
+// Wraps a piece of content and its field notes in a two-column row — content on the
+// left, notes in line with it on the right — instead of stacking the notes underneath.
+// Skips the wrapper entirely when there's nothing to show (no open note, and not the
+// coach view, which always has at least a "+ Note" button), so a field with no notes
+// renders exactly as before.
+function withNote(contentHtml, d, fieldKey, opts){
+  var noteHtml = noteBlockHtml(d, fieldKey, opts);
+  if(!noteHtml) return contentHtml;
+  return '<div class="field-with-note"><div class="field-with-note-content">'+contentHtml+'</div><div class="field-with-note-side">'+noteHtml+'</div></div>';
+}
+// An option's three note-able pieces (label, why, icon idea) share one right-hand
+// column rather than each getting their own withNote row — a `.p-opt` is one already-
+// flexed icon+content row, and three separate side columns stacked inside it would be
+// cramped. Each slot still keeps its own field key and its own fieldNoteLabel caption,
+// so it's unambiguous which piece of text a given note is about.
+function optionNotesColumnHtml(d, optKeyBase, opts){
+  var slots = ['label','rationale','icon'].map(function(sub){
+    var html = noteBlockHtml(d, optKeyBase+sub, opts);
+    if(!html) return '';
+    var subLabel = sub==='label' ? 'Label' : (sub==='rationale' ? 'Why' : 'Icon idea');
+    return '<div class="p-opt-note-slot"><div class="field-note-slot-label">'+subLabel+'</div>'+html+'</div>';
+  }).join('');
+  return slots;
+}
 function renderReviewPreview(d, opts){
   var scenarioBlocks = d.scenarios.map(function(sc,i){
     var optsHtml = sc.options.map(function(o,oi){
@@ -2504,43 +2671,52 @@ function renderReviewPreview(d, opts){
         ? '<img src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'
         : ICON_PLACEHOLDER_SVG;
       var optKeyBase = 'sc:'+sc.id+':opt:'+o.id+':';
-      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b>'+noteBlockHtml(d, optKeyBase+'label', opts)+'<span>'+esc(o.rationale)+'</span>'+noteBlockHtml(d, optKeyBase+'rationale', opts)+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+noteBlockHtml(d, optKeyBase+'icon', opts)+'</div></div>';
+      var optNotes = optionNotesColumnHtml(d, optKeyBase, opts);
+      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'">'+
+        '<span class="p-opt-icon">'+iconHtml+'</span>'+
+        '<div class="p-opt-content"><b>'+esc(o.label||'(untitled option)')+'.</b><span>'+esc(o.rationale)+'</span>'+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+'</div>'+
+        (optNotes? '<div class="p-opt-notes">'+optNotes+'</div>' : '')+
+      '</div>';
     }).join('');
     var cqs = sc.challenge.filter(function(q){return q.trim();}).map(function(q){return '<div>'+esc(q)+'</div>';}).join('');
-    var block = '<div class="p-scenario"><h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">🖥️ Preview</span></h4>'+
-      noteBlockHtml(d, 'sc:'+sc.id+':title', opts)+
-      '<div class="p-setup">'+esc(sc.setup)+'</div>'+
-      noteBlockHtml(d, 'sc:'+sc.id+':setup', opts)+
+    var titleHtml = '<h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">🖥️ Preview</span></h4>';
+    var setupHtml = '<div class="p-setup">'+esc(sc.setup)+'</div>';
+    var cqsHtml = cqs? '<div class="p-q-label">Challenge questions</div><div class="p-cqs">'+cqs+'</div>' : '';
+    var block = '<div class="p-scenario">'+
+      withNote(titleHtml, d, 'sc:'+sc.id+':title', opts)+
+      withNote(setupHtml, d, 'sc:'+sc.id+':setup', opts)+
       '<div class="p-opts">'+optsHtml+'</div>'+
-      (cqs? '<div class="p-q-label">Challenge questions</div><div class="p-cqs">'+cqs+'</div>' : '')+
-      noteBlockHtml(d, 'sc:'+sc.id+':challenge', opts)+
+      withNote(cqsHtml, d, 'sc:'+sc.id+':challenge', opts)+
       (sc.reflection? '<div class="p-q-label">Reflection question</div><div class="p-refl">'+esc(sc.reflection)+'</div>' : '')+
     '</div>';
     return block;
   });
   var half = d.halftime, refl = d.reflection;
-  var halftimeBlock = '<div class="p-half"><h4>Halftime</h4><div class="p-setup">'+esc(half.question)+'</div>'+
-    noteBlockHtml(d, 'halftime:question', opts)+
-    '<div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+
-    noteBlockHtml(d, 'halftime:options', opts)+
-    (half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>':'')+
-    noteBlockHtml(d, 'halftime:reflection', opts)+
+  // withNote still shows the "+ Note" control for the coach even when the underlying
+  // text is empty (contentHtml ''), matching how noteBlockHtml was always called here
+  // before this layout existed — a blank field is exactly when a coach most needs to
+  // leave one. It just doesn't invent a label for a student reading an empty field that
+  // was never there before.
+  var halftimeBlock = '<div class="p-half"><h4>Halftime</h4>'+
+    withNote('<div class="p-setup">'+esc(half.question)+'</div>', d, 'halftime:question', opts)+
+    withNote('<div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>', d, 'halftime:options', opts)+
+    withNote(half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>' : '', d, 'halftime:reflection', opts)+
   '</div>';
-  var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4><div class="p-setup">'+esc(refl.question)+'</div>'+
-    noteBlockHtml(d, 'reflection:question', opts)+
-    '<div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+
-    noteBlockHtml(d, 'reflection:options', opts)+
-    (refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>':'')+
-    noteBlockHtml(d, 'reflection:reflection', opts)+
+  var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4>'+
+    withNote('<div class="p-setup">'+esc(refl.question)+'</div>', d, 'reflection:question', opts)+
+    withNote('<div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>', d, 'reflection:options', opts)+
+    withNote(refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>' : '', d, 'reflection:reflection', opts)+
   '</div>';
 
-  var ideaBlock = d.bigIdea ? ('<div class="p-blurb p-internal"><span class="p-q-label" style="margin:0 0 4px;">Overall idea — notes for you and your coach, not part of the session</span><br>'+esc(d.bigIdea)+noteBlockHtml(d, 'bigIdea', opts)+'</div>') : '';
+  var ideaBlock = d.bigIdea ? withNote(
+    '<div class="p-blurb p-internal"><span class="p-q-label" style="margin:0 0 4px;">Overall idea — notes for you and your coach, not part of the session</span><br>'+esc(d.bigIdea)+'</div>',
+    d, 'bigIdea', opts
+  ) : '';
 
   return ''+
   '<div class="print-card">'+
     '<div class="p-eyebrow">SYNTHESIS DISCUSSION SESSION</div>'+
-    '<h2 class="p-title">'+esc(d.title||'Untitled Session')+'</h2>'+
-    noteBlockHtml(d, 'title', opts)+
+    withNote('<h2 class="p-title">'+esc(d.title||'Untitled Session')+'</h2>', d, 'title', opts)+
     ideaBlock+
     scenarioBlocks.slice(0,3).join('')+
     halftimeBlock+
@@ -2548,19 +2724,44 @@ function renderReviewPreview(d, opts){
     reflectionBlock+
   '</div>';
 }
+// One emoji per pipeline stage, shared by the coach inbox's group headings, every
+// status badge (via statusMeta below), and the student's own inbox on the home screen —
+// same visual language on both sides of the review, not a separate scheme each.
+var STAGE_EMOJI = {
+  draft: '📝', submitted: '📥', revision: '✏️', accepted: '🎉',
+  reviewed: '✅', pending: '✨', shipped: '🚀'
+};
 // Single source of truth for the status badge — three call sites (student review, inbox
 // row, coach review) used to each carry their own copy of this ternary, which is how the
 // 'submitted' label ended up drifting ("Waiting for coach" vs "Waiting for review") and
 // why the fallback for an unrecognized status quietly renders as "Reviewed" everywhere.
 function statusMeta(status, audience){
   var known = status==='draft' || status==='submitted' || status==='revision' || status==='reviewed' || status==='accepted';
-  var cls = 'status-'+(known ? status : 'reviewed');
+  var normalized = known ? status : 'reviewed';
+  var cls = 'status-'+normalized;
   var label = status==='draft' ? 'Drafting'
     : status==='submitted' ? (audience==='student' ? 'Waiting for coach' : 'Waiting for review')
     : status==='revision' ? (audience==='student' ? 'Sent back with notes' : 'Needs revision')
-    : status==='accepted' ? 'Accepted ✅'
+    : status==='accepted' ? 'Accepted'
     : 'Reviewed';
-  return {cls:cls, label:label};
+  return {cls:cls, label:label, emoji:STAGE_EMOJI[normalized], full:STAGE_EMOJI[normalized]+' '+label};
+}
+// A student's own draft never changes status past 'accepted' — the pending/shipped
+// distinction lives on the separate pending:<id> record their coach owns, looked up
+// into resumeStageById by enrichMatchesWithStage, so the home-screen inbox can show
+// "being polished" vs "shipped" instead of just "accepted" once it knows which. Falls
+// back to the plain statusMeta reading whenever that lookup hasn't happened or found
+// nothing (still loading, or an older accepted draft with no matching pending record).
+function studentStageMeta(d){
+  var pendingStatus = resumeStageById[d.id];
+  if(d.status==='accepted' && pendingStatus==='shipped'){
+    return {cls:'status-reviewed', full:STAGE_EMOJI.shipped+' Shipped to code'};
+  }
+  if(d.status==='accepted' && pendingStatus==='pending'){
+    return {cls:'status-submitted', full:STAGE_EMOJI.pending+' Being polished'};
+  }
+  var sm = statusMeta(d.status, 'student');
+  return {cls:sm.cls, full:sm.full};
 }
 function balanceStripHtml(){
   return '<div class="panel"><div class="balance-strip"><div class="bs-title"><span class="b-icon">⚖️</span>Balance self-check</div><ul>'+
@@ -2571,7 +2772,7 @@ function balanceStripHtml(){
 }
 function renderReview(){
   var d = state.draft;
-  var sm = statusMeta(d.status, 'student'), statusCls = sm.cls, statusLabel = sm.label;
+  var sm = statusMeta(d.status, 'student'), statusCls = sm.cls, statusLabel = sm.full;
   var accepted = d.status==='accepted';
   var notes = d.coachNotes.length? (
     '<div class="panel"><h3>Notes from your coach</h3><div class="coach-notes">'+
@@ -2609,7 +2810,7 @@ function renderReview(){
 // One row's markup — pulled out so the three priority groups below render
 // identically instead of three copies of the same template drifting apart.
 function renderInboxRow(d){
-  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.label;
+  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.full;
   return ''+
   '<div class="inbox-row" data-action="openInboxDraft" data-id="'+esc(d.id)+'">'+
     '<div class="ir-left"><h4>'+esc(d.title||'Untitled')+' — <span style="font-weight:400;">'+esc(d.studentName)+'</span></h4><p>CODE '+esc(d.id)+' · updated '+timeAgo(d.updatedAt)+'</p></div>'+
@@ -2646,7 +2847,7 @@ function renderPendingRow(p){
   return ''+
   '<div class="inbox-row" data-action="openPendingDraft" data-id="'+esc(p.id)+'">'+
     '<div class="ir-left"><h4>'+esc(p.title||'Untitled')+' — <span style="font-weight:400;">'+esc(p.studentName)+'</span></h4><p>CODE '+esc(p.id)+' · '+esc(statusLine)+'</p></div>'+
-    '<span class="status-badge '+(isShipped?'status-reviewed':'status-submitted')+'">'+(isShipped?'Shipped':'Pending')+'</span>'+
+    '<span class="status-badge '+(isShipped?'status-reviewed':'status-submitted')+'">'+(isShipped?STAGE_EMOJI.shipped+' Shipped':STAGE_EMOJI.pending+' Pending')+'</span>'+
   '</div>';
 }
 function renderShellInbox(){
@@ -2657,11 +2858,11 @@ function renderShellInbox(){
   var pendingRows = state.pendingList.filter(function(p){ return p.status==='pending'; });
   var shippedRows = state.pendingList.filter(function(p){ return p.status==='shipped'; });
   var rows = (state.inboxList.length || state.pendingList.length) ? (
-    renderInboxGroup('Ready for review', submitted)+
-    renderInboxGroup('Needs revision', needsRevision)+
-    renderInboxGroup('In progress', inProgress)+
-    renderInboxGroup('Pending polish', pendingRows, renderPendingRow)+
-    renderInboxGroup('Reviewed', reviewed)
+    renderInboxGroup(STAGE_EMOJI.submitted+' Ready for review', submitted)+
+    renderInboxGroup(STAGE_EMOJI.revision+' Needs revision', needsRevision)+
+    renderInboxGroup(STAGE_EMOJI.draft+' In progress', inProgress)+
+    renderInboxGroup(STAGE_EMOJI.pending+' Pending polish', pendingRows, renderPendingRow)+
+    renderInboxGroup(STAGE_EMOJI.reviewed+' Reviewed', reviewed)
   ) : (state.inboxLoading
     ? '<div class="empty-state">Loading drafts…</div>'
     : (state.inboxError
@@ -2747,7 +2948,7 @@ function renderShellInboxFlagged(){
     return '<div class="coach-note"><div class="cn-meta">'+timeAgo(inc.at)+' · '+esc(inc.severity)+'</div>"'+esc(inc.excerpt)+'"'+(inc.modelNote?('<div style="margin-top:4px; font-style:italic; color:#8B94A0;">Assistant note: '+esc(inc.modelNote)+'</div>'):'')+'</div>';
   }).join('');
   return ''+
-  '<div class="home-wrap" style="padding-top:44px; max-width:760px;">'+
+  '<div class="home-wrap inbox-draft-wrap">'+
     '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
     '<div class="panel">'+
       '<div style="margin-bottom:10px;"><span class="status-badge status-flagged">High priority</span></div>'+
@@ -2770,7 +2971,7 @@ function renderShellInboxFlagged(){
 function renderShellInboxDraft(){
   var d = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
   if(!d) return renderShellInbox();
-  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.label;
+  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.full;
   return ''+
   '<div class="home-wrap inbox-draft-wrap">'+
     '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
@@ -2850,11 +3051,17 @@ function renderPendingScreen(){
       '<button type="button" class="btn-icon" data-action="removeUsageWeek" data-week="'+esc(w)+'" title="Remove">✕</button></div>';
   }).join('');
 
+  // The "pending polish" pipeline example is meant to stay pending — shipping it would
+  // collapse two demo stages into one, so it gets the same reference-material treatment
+  // as the two seeded example sessions.
   var shipControls = locked
     ? '<div class="hint">Sent to code '+timeAgo(p.sentToCodeAt)+'.</div>'
-    : (''+
-        '<button type="button" class="btn btn-ghost" disabled title="Coming soon — will export directly to the session code / Notion">🚀 Ship to code — coming soon!</button>'+
-        '<button type="button" class="btn btn-primary" data-action="markSentToCode" data-id="'+esc(p.id)+'">✓ Mark as sent to code</button>'
+    : (isSeededExampleId(p.id)
+      ? '<div class="hint">This is a pipeline example, so there\'s nothing to ship — it\'s meant to stay Pending.</div>'
+      : (''+
+          '<button type="button" class="btn btn-ghost" disabled title="Coming soon — will export directly to the session code / Notion">🚀 Ship to code — coming soon!</button>'+
+          '<button type="button" class="btn btn-primary" data-action="markSentToCode" data-id="'+esc(p.id)+'">✓ Mark as sent to code</button>'
+        )
       );
 
   var blurbMissingMantra = !locked && p.parentBlurb.trim() && p.parentBlurb.indexOf(MANTRA)===-1;
@@ -3756,6 +3963,9 @@ function handleClick(e){
     var renameId = t.getAttribute('data-id');
     var renameDraft = state.resumeMatches.filter(function(d){ return d.id===renameId; })[0];
     if(!renameDraft) return;
+    // This list is reachable independent of state.draft, so the LOCKED_DRAFT_ACTIONS
+    // guard up top (which only looks at state.draft) never sees this one — check here too.
+    if(isDraftLocked(renameDraft)) return;
     var newTitle = prompt('Rename this draft:', renameDraft.title || '');
     if(newTitle===null) return; // cancelled
     newTitle = newTitle.trim();

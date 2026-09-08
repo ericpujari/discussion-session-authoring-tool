@@ -234,6 +234,19 @@ async function authorizeStudentKey(redis, op, key, value, owner) {
     return null;
   }
 
+  // Read-only, for the student inbox's stage indicator (pending vs. shipped) on an
+  // accepted draft -- see enrichMatchesWithStage in the client. A pending:<id> record
+  // shares its id with the draft: it was built from, so ownership is checked the same
+  // way notes: is above. Never writable here: only a coach creates or edits these.
+  if (key.startsWith('pending:')) {
+    if (op !== 'get') return { status: 403, error: 'Pending sessions can only be changed by a coach.' };
+    const id = key.slice('pending:'.length);
+    if (!id) return { status: 400, error: 'Missing draft id.' };
+    const rec = await readDraftOwner(redis, 'draft:' + id);
+    if (!rec.exists || rec.owner !== owner) return DENY;
+    return null;
+  }
+
   if (key.startsWith('moduser:')) {
     if (normalizeUsername(key.slice('moduser:'.length)) !== owner) return DENY;
     return null;
