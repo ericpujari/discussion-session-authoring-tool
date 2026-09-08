@@ -97,6 +97,10 @@
 
   /* ---------- Home ---------- */
   .home-wrap{max-width:1140px; margin:0 auto; padding:64px 24px 80px;}
+  /* Coach review page: no max-width cap, just a sticky-note's worth of gutter on each
+     side (STICKY_W = 170px in JS, kept in sync here) so the card grows with the window. */
+  .inbox-draft-wrap{max-width:none; margin:0; padding:44px 190px 80px;}
+  @media (max-width:900px){ .inbox-draft-wrap{padding-left:24px; padding-right:24px;} }
   .home-hero{text-align:center; color:#F2EEE1; margin-bottom:44px;}
   .home-hero h1{
     font-size:clamp(30px,5vw,46px); margin:14px 0 12px; line-height:1.14;
@@ -351,6 +355,8 @@
   .print-card .p-eyebrow{font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#9B8F6E;}
   .print-card h2.p-title{font-size:30px; margin:6px 0 10px;}
   .print-card .p-blurb{font-size:15px; line-height:1.6; color:#3c3527; margin-bottom:4px;}
+  .print-card .p-blurb.p-internal{background:#F0EBDA; border:1px dashed #C9BE9C; border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:16px;}
+  .print-card .p-blurb.p-internal .p-q-label{color:#8A7C52;}
   .p-scenario{padding:18px 0; border-top:1px solid var(--line);}
   .p-scenario h4{font-size:17px; margin-bottom:6px; display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
   .p-preview-link{font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--lane-a); cursor:pointer; white-space:nowrap; margin-left:auto;}
@@ -1838,7 +1844,7 @@ function stepDone(key){
 // (not just "storyboard incomplete") so a writer isn't left guessing which of six
 // scenarios still needs work.
 function firstIncompleteSubmitReason(d){
-  if(!stepDone('setup')) return 'Add a title and the big idea on the Setup page before submitting.';
+  if(!stepDone('setup')) return 'Add a title and your overall idea on the Setup page before submitting.';
   for(var i=0;i<d.scenarios.length;i++){
     if(!scenarioComplete(d.scenarios[i])){
       var titleBit = d.scenarios[i].title.trim() ? ' ("'+d.scenarios[i].title.trim()+'")' : '';
@@ -1901,10 +1907,10 @@ function renderShellDraft(){
 function renderSetup(){
   var d = state.draft;
   return ''+
-  '<div class="page-head"><div class="eyebrow">STEP 1</div><h2>Set up your session</h2><p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
+  '<div class="page-head"><div class="eyebrow">STEP 1</div><h2>Set up your session</h2><p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p><p>Start with a rough title and your overall idea. Our team will turn this into the official intro.</p></div>'+
   '<div class="panel">'+
-    '<div class="field"><label>Title</label><input type="text" data-bind="title" maxlength="80" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">A short phrase, often a question. 1-4 words.</div></div>'+
-    '<div class="field"><label>Overall idea for this session</label><textarea data-bind="bigIdea" maxlength="2000" placeholder="What real-life tension does this session explore? Why does it matter to you?" style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">More detail helps — context, examples, why it matters. Every session ends with the same spirit: "'+MANTRA+'"</div></div>'+
+    '<div class="field"><label>Thoughts for a title</label><input type="text" data-bind="title" maxlength="80" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">Doesn\'t have to be final — a short phrase, often a question. 1-4 words.</div></div>'+
+    '<div class="field"><label>Overall idea for the session</label><textarea data-bind="bigIdea" maxlength="2000" placeholder="What real-life tension does this session explore? Why does it matter to you? Jot down whatever comes to mind." style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">This is a brainstorm space for you and your coach — not something parents will see. Get your thoughts down; more detail helps.</div></div>'+
   '</div>'+
   (d.coachNotes.length? renderCoachNotesPreview() : '')+
   '<button class="btn btn-primary" data-action="nav" data-target="storyboard">Next: build your storyboard →</button>';
@@ -2045,7 +2051,6 @@ function renderScenario(){
     '<h3>Challenge questions</h3>'+
     '<div class="qlist">'+chQ+'</div>'+
     (sc.challenge.length<4? '<button class="add-row-btn" data-action="addChallenge">+ Add another challenge question</button>' : '')+
-    '<div class="field" style="margin-top:16px;"><label>Reflection question</label><textarea data-bind="scReflection" maxlength="300" placeholder="Turn it toward your own life or your team today...">'+esc(sc.reflection)+'</textarea></div>'+
   '</div>'+
   '<div class="scenario-nav">'+
     '<button class="btn btn-ghost-light" data-action="prevScenario" '+(i===0?'disabled':'')+'>← Scenario '+i+'</button>'+
@@ -2199,7 +2204,7 @@ function renderReviewPreview(d){
   var halftimeBlock = '<div class="p-half"><h4>Halftime</h4><div class="p-setup">'+esc(half.question)+'</div><div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+(half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>':'')+'</div>';
   var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4><div class="p-setup">'+esc(refl.question)+'</div><div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+(refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>':'')+'</div>';
 
-  var ideaBlock = d.bigIdea ? ('<div class="p-blurb"><span class="p-q-label" style="margin:0 0 4px;">The big idea</span><br>'+esc(d.bigIdea)+'</div>') : '';
+  var ideaBlock = d.bigIdea ? ('<div class="p-blurb p-internal"><span class="p-q-label" style="margin:0 0 4px;">Overall idea — notes for you and your coach, not part of the session</span><br>'+esc(d.bigIdea)+'</div>') : '';
 
   return ''+
   '<div class="print-card">'+
@@ -2385,7 +2390,7 @@ function renderShellInboxDraft(){
   var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
   var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
   return ''+
-  '<div class="home-wrap" style="padding-top:44px; max-width:760px;">'+
+  '<div class="home-wrap inbox-draft-wrap">'+
     '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
     '<div style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">'+
       '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
@@ -2930,7 +2935,6 @@ function updateDraftField(bind, el, oidx, qidx){
   else if(bind==='scTitle') d.scenarios[state.scenarioIndex].title=v;
   else if(bind==='scDomain') d.scenarios[state.scenarioIndex].domain=v;
   else if(bind==='scSetup') d.scenarios[state.scenarioIndex].setup=v;
-  else if(bind==='scReflection') d.scenarios[state.scenarioIndex].reflection=v;
   else if(bind==='option.label') d.scenarios[state.scenarioIndex].options[oidx].label=v;
   else if(bind==='option.rationale') d.scenarios[state.scenarioIndex].options[oidx].rationale=v;
   else if(bind==='option.iconDescription') d.scenarios[state.scenarioIndex].options[oidx].iconDescription=v;
