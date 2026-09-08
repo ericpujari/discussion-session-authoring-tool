@@ -133,7 +133,22 @@ per-scenario editing panels, not one long form — Setup → Storyboard (6 scena
 a fixed halftime card, drag or move-buttons to reorder) → Closing reflection → Review &
 submit. Multi-user save-and-resume, by username, no accounts. Export is Markdown
 matching the reference sessions' structure. The review/handoff step is the coach inbox
-described above — export is not the end of the tool's job, submission is.
+described above — export is not the end of the tool's job, submission is. The
+per-scenario reflection question (one per scenario in the final structure — see "Source
+of truth" above) is written by the coach, not the student; the field is hidden from the
+student's scenario editor.
+
+Coach review, beyond a single feedback box: a coach can leave a note on any individual
+field (title, a scenario's setup, one option's rationale, etc.) via "+ Note" in the
+review view; open notes surface back to the student as a draggable, read-only "editor's
+note" on the matching screen until the coach ticks them done. "Send back with notes"
+reverts a submission to a distinct `revision` status (its own inbox group) rather than
+folding back into "In progress". Accepting a draft ("Accepted ✅") freezes the student's
+copy (read-only, download still works) and spins off a separate `pending:<id>` record —
+a coach-only polish screen with every field editable plus the parent blurb and the six
+reflection questions. From there, "Mark as sent to code" moves it into a "Past sessions"
+archive (student username, date sent, a running list of "week of" reuse dates); "Ship to
+code" itself is a disabled coming-soon button, not yet wired to anything.
 
 Known, accepted gap for the current test deployment: no real student authentication —
 resume-by-username means typing someone else's username reaches their drafts. See the

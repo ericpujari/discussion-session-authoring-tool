@@ -97,6 +97,10 @@
 
   /* ---------- Home ---------- */
   .home-wrap{max-width:1140px; margin:0 auto; padding:64px 24px 80px;}
+  /* Coach review page: no max-width cap, just a sticky-note's worth of gutter on each
+     side (STICKY_W = 170px in JS, kept in sync here) so the card grows with the window. */
+  .inbox-draft-wrap{max-width:none; margin:0; padding:44px 190px 80px;}
+  @media (max-width:900px){ .inbox-draft-wrap{padding-left:24px; padding-right:24px;} }
   .home-hero{text-align:center; color:#F2EEE1; margin-bottom:44px;}
   .home-hero h1{
     font-size:clamp(30px,5vw,46px); margin:14px 0 12px; line-height:1.14;
@@ -351,6 +355,8 @@
   .print-card .p-eyebrow{font-family:var(--font-mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:#9B8F6E;}
   .print-card h2.p-title{font-size:30px; margin:6px 0 10px;}
   .print-card .p-blurb{font-size:15px; line-height:1.6; color:#3c3527; margin-bottom:4px;}
+  .print-card .p-blurb.p-internal{background:#F0EBDA; border:1px dashed #C9BE9C; border-radius:var(--radius-sm); padding:14px 16px; margin-bottom:16px;}
+  .print-card .p-blurb.p-internal .p-q-label{color:#8A7C52;}
   .p-scenario{padding:18px 0; border-top:1px solid var(--line);}
   .p-scenario h4{font-size:17px; margin-bottom:6px; display:flex; align-items:baseline; justify-content:space-between; gap:10px;}
   .p-preview-link{font-family:var(--font-body); font-size:12.5px; font-weight:600; color:var(--lane-a); cursor:pointer; white-space:nowrap; margin-left:auto;}
@@ -369,12 +375,44 @@
   .p-refl{font-size:13.5px; font-style:italic; color:#3c3527;}
   .p-half{padding:18px 0; border-top:2px dashed var(--line);}
 
+  /* ---------- Coach editor's notes (per-field, review preview) ---------- */
+  .field-notes{margin:6px 0 4px;}
+  .field-note{background:#FBEAE7; border:1px solid #E8C3BC; border-radius:8px; padding:8px 10px; margin-bottom:6px; font-size:12.5px; line-height:1.5;}
+  .field-note-text{color:#7A342A;}
+  .field-note-meta{font-family:var(--font-mono); font-size:10.5px; color:#9B6459; margin-top:4px;}
+  .field-note-done{display:inline-flex; align-items:center; gap:5px; cursor:pointer; text-transform:none; letter-spacing:0;}
+  .field-note-add-btn{font-size:11.5px; font-weight:600; color:var(--lane-a); background:none; border:none; padding:2px 0; cursor:pointer; margin-bottom:6px;}
+  .field-note-add-btn:hover{text-decoration:underline;}
+  .field-note-compose{background:#fff; border:1.5px solid var(--line); border-radius:9px; padding:10px; margin-bottom:8px;}
+  .field-note-compose-label{font-family:var(--font-mono); font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#9B8F6E; margin-bottom:6px;}
+  .field-note-compose textarea{width:100%; min-height:60px; border:none; font-family:var(--font-body); font-size:13px; resize:vertical;}
+  .field-note-compose textarea:focus{outline:none;}
+  .field-note-compose-actions{display:flex; justify-content:flex-end; gap:8px; margin-top:6px;}
+
+  /* ---------- Pending (coach polish screen) ---------- */
+  .hint-inline{font-size:11px; font-weight:400; color:#8B94A0; text-transform:none; letter-spacing:0;}
+  .pending-options{display:flex; flex-direction:column; gap:12px; margin-top:12px;}
+  .pending-option{border-left:4px solid var(--c); background:var(--soft); border-radius:10px; padding:12px 14px;}
+  .pending-option .field{margin-bottom:8px;}
+  .pending-option .field:last-child{margin-bottom:0;}
+  .usage-week-row{display:flex; align-items:center; justify-content:space-between; padding:6px 0; border-bottom:1px dashed var(--line); font-size:13.5px;}
+  .usage-week-row:last-of-type{border-bottom:none; margin-bottom:10px;}
+  .usage-week-add{display:flex; align-items:center; gap:8px;}
+  .usage-week-add input[type="date"]{padding:6px 8px; border:1.5px solid var(--line); border-radius:8px; font-family:inherit; font-size:13px;}
+
   .review-actions{display:flex; flex-wrap:wrap; gap:10px; margin-top:6px;}
   .status-badge{font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:.05em; padding:5px 11px; border-radius:999px; font-weight:600;}
   .status-draft{background:var(--lane-b-soft); color:#403A6E;}
   .status-submitted{background:var(--lane-c-soft); color:#7A5A16;}
+  .status-revision{background:var(--lane-d-soft); color:#7A3C54;}
   .status-reviewed{background:var(--lane-a-soft); color:#1E5B56;}
+  .status-accepted{background:var(--lane-a-soft); color:#1E5B56;}
   .status-flagged{background:#F5D4CF; color:#8A241A;}
+
+  .accept-banner{display:flex; gap:14px; align-items:flex-start; background:var(--lane-a-soft); border:1.5px solid var(--lane-a-line);}
+  .accept-banner-icon{font-size:28px; line-height:1;}
+  .accept-banner h3{margin-bottom:4px;}
+  .accept-banner p{font-size:13.5px; line-height:1.5; margin:0;}
 
   .coach-notes{background:#fff; border-radius:10px; padding:16px 18px; border:1.5px solid var(--line);}
   .coach-note{padding:10px 0; border-bottom:1px dashed var(--line); font-size:13.8px; line-height:1.5;}
@@ -497,6 +535,28 @@
     font-size:13px; font-family:inherit; color:#3c3527;
   }
 
+  /* ---------- Coach editor's notes (student-facing) ----------
+     Deliberately not a sticky note: an arrow-shaped callout pointing back at the field
+     it's about, red/coral so it reads as "an adult marked this up" rather than the
+     student's own yellow/pink/blue/green/purple stickies. Draggable, but no delete and
+     no recolor — only a coach clears it, from the review page. */
+  .editor-note{
+    position:fixed; width:200px; background:#FCEBE7; border:1.5px solid #E3A99D;
+    border-radius:10px; box-shadow:var(--shadow-sm); padding:10px 26px 10px 14px;
+  }
+  .editor-note::before{
+    content:''; position:absolute; left:-9px; top:16px; width:0; height:0;
+    border-top:8px solid transparent; border-bottom:8px solid transparent; border-right:9px solid #E3A99D;
+  }
+  .editor-note::after{
+    content:''; position:absolute; left:-7px; top:16px; width:0; height:0;
+    border-top:7px solid transparent; border-bottom:7px solid transparent; border-right:8px solid #FCEBE7;
+  }
+  .editor-note-drag{position:absolute; top:6px; right:6px; color:#C98A7B; cursor:grab; padding:2px;}
+  .editor-note-drag:active{cursor:grabbing;}
+  .editor-note-text{font-size:12.5px; line-height:1.5; color:#7A342A; white-space:pre-wrap; word-break:break-word;}
+  .editor-note-byline{font-family:var(--font-mono); font-size:10px; text-transform:uppercase; letter-spacing:.04em; color:#B9807A; margin-top:6px;}
+
   /* ---------- Coach inbox ---------- */
   .inbox-group{margin-bottom:26px;}
   .inbox-group:last-child{margin-bottom:0;}
@@ -513,6 +573,7 @@
     background:var(--lane-c-soft); border:1.5px solid var(--lane-c-line); color:#7A5A16; padding:12px 16px; border-radius:10px;
     font-size:13.5px; margin-bottom:18px; display:flex; align-items:center; gap:8px;
   }
+  .banner[hidden]{display:none;} /* .banner's own display:flex above would otherwise beat the bare [hidden] attribute */
   .guardrail-box{background:rgba(255,255,255,.06); border-radius:10px; padding:14px 16px; margin-top:14px;}
   .guardrail-box summary{color:#fff; font-size:13px; font-weight:600; cursor:pointer;}
   .guardrail-box ul{margin:10px 0 0; padding-left:18px; color:#C7D2DD; font-size:12.5px; line-height:1.7;}
@@ -876,7 +937,12 @@ var state = {
   iconEmbedError: '',
   submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
   feedbackSending: false, feedbackSent: false, feedbackError: '',  // beta-test feedback tool — see FEEDBACK_ENABLED
-  inboxFeedbackList: [], inboxFeedbackLoading: false, inboxFeedbackError: ''
+  inboxFeedbackList: [], inboxFeedbackLoading: false, inboxFeedbackError: '',
+  composingNoteField: null,  // coach review only: field key whose "+ Note" compose box is open
+  editorNoteBusy: false,     // coach review only: a note save/resolve round-trip is in flight
+  pendingList: [],           // coach inbox only: accepted sessions being polished, or already shipped
+  pendingSelectedId: null,
+  pendingDraft: null         // the pending record currently open on the polish screen
 };
 
 var REDIRECT_MESSAGE_1 = "This assistant is here to help you build your own Discussion Session for Synthesis — things like scenario setups, options, and questions other students will discuss. Let's focus on that. What part of your session would you like help with?";
@@ -982,6 +1048,7 @@ function newDraft(name){
     reflection:{question:'', options:['',''], reflection:''},
     aiChat: [],
     coachNotes: [],
+    editorNotes: [],
     coachMessage: ''
   };
   for(var i=0;i<6;i++) d.scenarios.push(newScenario.call(null));
@@ -1249,6 +1316,7 @@ function buildExampleDraft(key){
     reflection: {question:src.reflection.question, options:src.reflection.options.slice(), reflection:src.reflection.reflection},
     aiChat: [],
     coachNotes: [],
+    editorNotes: [],
     coachMessage: ''
   };
   return d;
@@ -1287,6 +1355,89 @@ function currentAttachForScreen(){
   if(state.screen==='halftimeEditor') return {type:'halftime'};
   if(state.screen==='reflection') return {type:'reflection'};
   return {type:'storyboard'}; // 'review' has no dedicated space; falls back to general
+}
+
+/* ---------- Coach editor's notes (shared, student-visible until resolved) ----------
+   Unlike the private stickies above, these live inside the draft record itself, so a
+   coach can write one and a student sees it on their next visit. Fields are keyed by
+   scenario/option ID rather than array index — scenarios and options get reordered
+   (moveScenario, drag/drop), and an index-keyed note would silently drift onto the
+   wrong one. See parseFieldKey for the key grammar. */
+function newEditorNote(field, text){
+  return {id:uid(), field:field, text:text||'', at:Date.now(), resolvedAt:null, x:null, y:null};
+}
+function patchEditorNote(n){
+  if(typeof n.id !== 'string' || !n.id) n.id = uid();
+  if(typeof n.field !== 'string') n.field = '';
+  if(typeof n.text !== 'string') n.text = '';
+  if(typeof n.at !== 'number') n.at = Date.now();
+  if(typeof n.resolvedAt !== 'number') n.resolvedAt = null;
+  if(typeof n.x !== 'number') n.x = null;
+  if(typeof n.y !== 'number') n.y = null;
+  return n;
+}
+// Key grammar: 'title' | 'bigIdea' | 'sc:<scenarioId>:title|setup|challenge' |
+// 'sc:<scenarioId>:opt:<optionId>:label|rationale|icon' |
+// 'halftime:question|options|reflection' | 'reflection:question|options|reflection'
+function parseFieldKey(key){
+  if(key==='title' || key==='bigIdea') return {kind:'setup', sub:key};
+  if(key.indexOf('halftime:')===0) return {kind:'halftime', sub:key.slice(9)};
+  if(key.indexOf('reflection:')===0) return {kind:'reflection', sub:key.slice(11)};
+  if(key.indexOf('sc:')===0){
+    var parts = key.slice(3).split(':');
+    if(parts[1]==='opt') return {kind:'scenarioOption', scenarioId:parts[0], optionId:parts[2], sub:parts[3]};
+    return {kind:'scenario', scenarioId:parts[0], sub:parts[1]};
+  }
+  return {kind:'unknown', sub:key};
+}
+function scenarioIndexById(d, scenarioId){
+  for(var i=0;i<d.scenarios.length;i++){ if(d.scenarios[i].id===scenarioId) return i; }
+  return -1;
+}
+function optionIndexById(sc, optionId){
+  for(var i=0;i<sc.options.length;i++){ if(sc.options[i].id===optionId) return i; }
+  return -1;
+}
+// Which student screen a note belongs on, so the editor-note layer knows when to show it.
+// Returns null if the scenario it was attached to no longer exists (shouldn't happen —
+// scenarios are never deleted — but keeps a stray note from throwing instead of hiding).
+function screenForFieldKey(key, d){
+  var p = parseFieldKey(key);
+  if(p.kind==='setup') return {screen:'setup'};
+  if(p.kind==='halftime') return {screen:'halftimeEditor'};
+  if(p.kind==='reflection') return {screen:'reflection'};
+  if(p.kind==='scenario' || p.kind==='scenarioOption'){
+    var idx = scenarioIndexById(d, p.scenarioId);
+    if(idx===-1) return null;
+    return {screen:'scenario', scenarioIndex:idx};
+  }
+  return null;
+}
+// Human label for the coach's own view — "Scenario 2 · Option B — why", etc.
+function fieldNoteLabel(key, d){
+  var p = parseFieldKey(key);
+  if(p.kind==='setup') return p.sub==='title' ? 'Thoughts for a title' : 'Overall idea';
+  if(p.kind==='halftime'){
+    return 'Halftime — '+(p.sub==='question'?'Question':(p.sub==='options'?'Options':'Forward-looking line'));
+  }
+  if(p.kind==='reflection'){
+    return 'Closing reflection — '+(p.sub==='question'?'Question':(p.sub==='options'?'Options':'Closing line'));
+  }
+  if(p.kind==='scenario' || p.kind==='scenarioOption'){
+    var idx = scenarioIndexById(d, p.scenarioId);
+    var scenarioLabel = 'Scenario '+(idx===-1? '?' : (idx+1));
+    if(p.kind==='scenario'){
+      return scenarioLabel+' — '+(p.sub==='title'?'Title':(p.sub==='setup'?'Setup':'Challenge questions'));
+    }
+    var sc = idx===-1 ? null : d.scenarios[idx];
+    var oi = sc ? optionIndexById(sc, p.optionId) : -1;
+    var optLabel = 'Option '+(oi===-1? '?' : (oi+1));
+    return scenarioLabel+' · '+optLabel+' — '+(p.sub==='label'?'Label':(p.sub==='rationale'?'Why':'Icon idea'));
+  }
+  return 'Note';
+}
+function openNotesFor(d, key){
+  return d.editorNotes.filter(function(n){ return n.field===key && !n.resolvedAt; });
 }
 
 /* ============================= STORAGE ============================= */
@@ -1346,6 +1497,41 @@ function scheduleSaveRetry(draftId){
     if(state.draft && state.draft.id === draftId && isDirty) saveDraft();
   }, delay);
 }
+
+/* ---------- Pending draft autosave (coach polish screen) ----------
+   A lighter version of the student save above — one save attempt, not a retry ladder,
+   since a coach editing their own polish copy can just try again rather than needing
+   the same resilience a kid mid-session does. setPendingSaveIndicator mirrors
+   setSaveIndicator's targeted DOM update instead of a full render(), so a coach typing
+   in a field doesn't get their cursor position reset by an autosave firing mid-keystroke. */
+var pendingSaveTimer = null, pendingDirty = false, pendingSaveStatus = 'saved';
+function setPendingSaveIndicator(status){
+  pendingSaveStatus = status;
+  var el = document.getElementById('pendingSaveIndicator');
+  if(!el) return;
+  el.className = 'rail-save-indicator '+status;
+  el.textContent = saveStatusText(status);
+}
+function debouncePendingSave(){
+  pendingDirty = true;
+  setPendingSaveIndicator('unsaved');
+  if(pendingSaveTimer) clearTimeout(pendingSaveTimer);
+  pendingSaveTimer = setTimeout(savePendingDraft, 600);
+}
+function savePendingDraft(){
+  if(!hasStorage || !state.pendingDraft) return Promise.resolve();
+  if(pendingSaveTimer){ clearTimeout(pendingSaveTimer); pendingSaveTimer = null; }
+  pendingDirty = false;
+  state.pendingDraft.updatedAt = Date.now();
+  setPendingSaveIndicator('saving');
+  return window.storage.set('pending:'+state.pendingDraft.id, JSON.stringify(state.pendingDraft), true).then(function(){
+    setPendingSaveIndicator(pendingDirty ? 'unsaved' : 'saved');
+  }).catch(function(e){
+    console.error('pending save failed', e);
+    pendingDirty = true;
+    setPendingSaveIndicator('failed');
+  });
+}
 // Every load path funnels through here (loadDraft, listAllDrafts, listDraftsForUser),
 // so this is the one place that can guarantee the shape the render code assumes.
 // It has to be total: renderers call .trim() on title/setup/label/rationale and index
@@ -1398,6 +1584,7 @@ function patchLegacyDraft(d){
   if(typeof d.id !== 'string' || !d.id) return null; // no key, nothing we can save back to
   if(typeof d.studentName !== 'string' || !d.studentName) d.studentName = 'Student';
   if(typeof d.status !== 'string') d.status = 'draft';
+  if(typeof d.acceptedAt !== 'number') d.acceptedAt = null;
   if(typeof d.createdAt !== 'number') d.createdAt = Date.now();
   if(typeof d.updatedAt !== 'number') d.updatedAt = d.createdAt;
   if(typeof d.title !== 'string') d.title = '';
@@ -1407,6 +1594,8 @@ function patchLegacyDraft(d){
   }
   if(!Array.isArray(d.coachNotes)) d.coachNotes = [];
   d.coachNotes = d.coachNotes.filter(function(n){ return n && typeof n.text === 'string'; });
+  if(!Array.isArray(d.editorNotes)) d.editorNotes = [];
+  d.editorNotes = d.editorNotes.filter(function(n){ return n && typeof n.field === 'string' && typeof n.text === 'string'; }).map(patchEditorNote);
   if(!Array.isArray(d.aiChat)) d.aiChat = [];
   if(typeof d.coachMessage !== 'string') d.coachMessage = '';
   d.halftime = patchCheckinBlock(d.halftime);
@@ -1419,6 +1608,59 @@ function patchLegacyDraft(d){
   });
   while(d.scenarios.length < SCENARIO_COUNT) d.scenarios.push(patchScenario(null, d.optionCount));
   return d;
+}
+
+/* ---------- Pending (post-acceptance polish) ----------
+   A snapshot the coach polishes on its own, independent of the student's now-locked
+   draft — see acceptDraft. Reuses patchScenario/patchCheckinBlock since the shape is
+   the same, plus the coach-only fields (parentBlurb, per-scenario reflection is now
+   writable here) that never existed on the student side. */
+function newPendingFromDraft(d){
+  return {
+    id: d.id,
+    studentName: d.studentName,
+    title: d.title,
+    bigIdea: d.bigIdea, // carried over for the coach's own reference only — never shown to students, never exported
+    parentBlurb: '',
+    optionCount: d.optionCount,
+    scenarios: d.scenarios.map(function(sc){
+      return {
+        id: sc.id, title: sc.title, domain: sc.domain, setup: sc.setup,
+        options: sc.options.map(function(o){
+          return {id:o.id, label:o.label, rationale:o.rationale, iconDescription:o.iconDescription, selectedIcon:o.selectedIcon, colorIndex:o.colorIndex};
+        }),
+        challenge: sc.challenge.slice(),
+        reflection: sc.reflection
+      };
+    }),
+    halftime: {question:d.halftime.question, options:d.halftime.options.slice(), reflection:d.halftime.reflection},
+    reflection: {question:d.reflection.question, options:d.reflection.options.slice(), reflection:d.reflection.reflection},
+    status: 'pending',        // 'pending' | 'shipped'
+    usageWeeks: [],            // ISO date strings, each meaning "the week of this date"
+    sentToCodeAt: null,
+    createdAt: Date.now(), updatedAt: Date.now()
+  };
+}
+function patchPendingRecord(p){
+  if(!p || typeof p !== 'object' || Array.isArray(p)) return null;
+  if(typeof p.id !== 'string' || !p.id) return null;
+  if(typeof p.studentName !== 'string' || !p.studentName) p.studentName = 'Student';
+  if(typeof p.title !== 'string') p.title = '';
+  if(typeof p.bigIdea !== 'string') p.bigIdea = '';
+  if(typeof p.parentBlurb !== 'string') p.parentBlurb = '';
+  if(typeof p.optionCount !== 'number' || p.optionCount < 2 || p.optionCount > LANES.length) p.optionCount = 3;
+  if(!Array.isArray(p.scenarios)) p.scenarios = [];
+  p.scenarios = p.scenarios.slice(0, SCENARIO_COUNT).map(function(sc){ return patchScenario(sc, p.optionCount); });
+  while(p.scenarios.length < SCENARIO_COUNT) p.scenarios.push(patchScenario(null, p.optionCount));
+  p.halftime = patchCheckinBlock(p.halftime);
+  p.reflection = patchCheckinBlock(p.reflection);
+  if(p.status !== 'pending' && p.status !== 'shipped') p.status = 'pending';
+  if(!Array.isArray(p.usageWeeks)) p.usageWeeks = [];
+  p.usageWeeks = p.usageWeeks.filter(function(w){ return typeof w === 'string' && w; });
+  if(typeof p.sentToCodeAt !== 'number') p.sentToCodeAt = null;
+  if(typeof p.createdAt !== 'number') p.createdAt = Date.now();
+  if(typeof p.updatedAt !== 'number') p.updatedAt = p.createdAt;
+  return p;
 }
 function loadDraft(code){
   if(!hasStorage) return Promise.resolve(null);
@@ -1439,6 +1681,27 @@ function listAllDrafts(){
     return Promise.all(keys.map(function(k){
       return window.storage.get(k, true).then(function(res){
         try{ return patchLegacyDraft(JSON.parse(res.value)); }catch(e){ return null; }
+      });
+    }));
+  }).then(function(list){
+    return list.filter(Boolean).sort(function(a,b){ return b.updatedAt - a.updatedAt; });
+  });
+}
+function loadPending(id){
+  if(!hasStorage) return Promise.resolve(null);
+  return window.storage.get('pending:'+id.trim().toUpperCase(), true).then(function(r){
+    if(!r) return null;
+    try { return patchPendingRecord(JSON.parse(r.value)); }
+    catch(e){ return null; }
+  });
+}
+function listAllPending(){
+  if(!hasStorage) return Promise.resolve([]);
+  return window.storage.list('pending:', true).then(function(r){
+    var keys = (r && r.keys) || [];
+    return Promise.all(keys.map(function(k){
+      return window.storage.get(k, true).then(function(res){
+        try{ return patchPendingRecord(JSON.parse(res.value)); }catch(e){ return null; }
       });
     }));
   }).then(function(list){
@@ -1520,6 +1783,7 @@ function ensureExampleDraftsSeeded(){
       var merged = Object.assign({}, fresh, {
         status: old.status || 'submitted',
         coachNotes: old.coachNotes || [],
+        editorNotes: old.editorNotes || [],
         coachMessage: old.coachMessage || '',
         createdAt: old.createdAt || fresh.createdAt,
         updatedAt: old.updatedAt || fresh.updatedAt
@@ -1620,14 +1884,23 @@ function render(){
   else if(state.screen==='inboxDraft') html = renderShellInboxDraft();
   else if(state.screen==='inboxFlagged') html = renderShellInboxFlagged();
   else if(state.screen==='inboxFeedback') html = renderShellInboxFeedback();
+  else if(state.screen==='pendingDraft') html = renderPendingScreen();
   else if(state.screen==='playerPreview') html = renderPlayerPreview();
   else if(state.screen==='feedback') html = renderFeedback();
   else html = renderShellDraft();
   app.innerHTML = html;
   attachGlobalHandlers();
-  if(state.screen!=='home' && state.screen!=='coachLogin' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='inboxFeedback' && state.screen!=='playerPreview' && state.screen!=='feedback' && state.draft){
+  if(state.screen!=='home' && state.screen!=='coachLogin' && state.screen!=='inbox' && state.screen!=='inboxDraft' && state.screen!=='inboxFlagged' && state.screen!=='inboxFeedback' && state.screen!=='pendingDraft' && state.screen!=='playerPreview' && state.screen!=='feedback' && state.draft){
     if(AI_ASSISTANT_ENABLED) renderCoachOverlay();
     renderStickyLayer();
+    renderEditorNoteLayer();
+    // Accepted drafts are frozen — see isDraftLocked/acceptDraft. Disabling every form
+    // field at the DOM level (rather than threading a "locked" flag through every
+    // render*() template) is the belt-and-suspenders half of the lock; updateDraftField
+    // refusing to write is the other half.
+    if(isDraftLocked(state.draft)){
+      app.querySelectorAll('input, textarea, select').forEach(function(el){ el.disabled = true; });
+    }
   }
 }
 
@@ -1776,6 +2049,15 @@ function loadInbox(){
     state.inboxError='Couldn\'t reach storage, so drafts can\'t be listed right now. Nothing has been lost — reload to try again.';
     state.inboxList=[]; render();
   });
+  // Pending polish + past-sessions rows load alongside the main draft list, on their own
+  // failure path — a hiccup here shouldn't block the main inbox from showing.
+  listAllPending().then(function(list){
+    state.pendingList=list; render();
+  }).catch(function(e){
+    console.error('pending list load failed', e);
+    if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+    state.pendingList=[]; render();
+  });
   // Same reasoning as enterDraft, but this one costs a full Redis SCAN of moduser:*
   // every time a coach opens the inbox — for a flagged-accounts list that is always
   // empty while the assistant is off.
@@ -1838,7 +2120,7 @@ function stepDone(key){
 // (not just "storyboard incomplete") so a writer isn't left guessing which of six
 // scenarios still needs work.
 function firstIncompleteSubmitReason(d){
-  if(!stepDone('setup')) return 'Add a title and the big idea on the Setup page before submitting.';
+  if(!stepDone('setup')) return 'Add a title and your overall idea on the Setup page before submitting.';
   for(var i=0;i<d.scenarios.length;i++){
     if(!scenarioComplete(d.scenarios[i])){
       var titleBit = d.scenarios[i].title.trim() ? ' ("'+d.scenarios[i].title.trim()+'")' : '';
@@ -1894,17 +2176,23 @@ function renderShellDraft(){
   var exampleBanner = state.draft.isExample
     ? '<div class="banner">👀 <span><strong>Example session</strong> — have a look around and try things out. Changes here aren\'t saved.</span></div>'
     : '';
-  return '<div class="shell">'+railHtml()+'<div class="main">'+exampleBanner+body+'</div></div>';
+  // One central spot for the locked-draft notice, so a student who navigates to Setup
+  // or a scenario after acceptance (not just the Review page) still sees why everything
+  // is greyed out — see isDraftLocked/render()'s disabled-field pass.
+  var lockedBanner = (isDraftLocked(state.draft) && state.screen!=='review')
+    ? '<div class="banner">🔒 <span>This session was accepted and is locked while your coach polishes it — see the Review page.</span></div>'
+    : '';
+  return '<div class="shell">'+railHtml()+'<div class="main">'+exampleBanner+lockedBanner+body+'</div></div>';
 }
 
 /* ---------- Setup ---------- */
 function renderSetup(){
   var d = state.draft;
   return ''+
-  '<div class="page-head"><div class="eyebrow">STEP 1</div><h2>Set up your session</h2><p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p><p>Every session starts with a title and the big idea behind it. Our team will turn this into the official intro.</p></div>'+
+  '<div class="page-head"><div class="eyebrow">STEP 1</div><h2>Set up your session</h2><p>Six scenarios. No right answers. Just your ideas, put to the test — with a coach in your corner.</p><p>Start with a rough title and your overall idea. Our team will turn this into the official intro.</p></div>'+
   '<div class="panel">'+
-    '<div class="field"><label>Title</label><input type="text" data-bind="title" maxlength="80" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">A short phrase, often a question. 1-4 words.</div></div>'+
-    '<div class="field"><label>Overall idea for this session</label><textarea data-bind="bigIdea" maxlength="2000" placeholder="What real-life tension does this session explore? Why does it matter to you?" style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">More detail helps — context, examples, why it matters. Every session ends with the same spirit: "'+MANTRA+'"</div></div>'+
+    '<div class="field"><label>Thoughts for a title</label><input type="text" data-bind="title" maxlength="80" value="'+esc(d.title)+'" placeholder="e.g. Fixed or Flexible?"><div class="hint">Doesn\'t have to be final — a short phrase, often a question. 1-4 words.</div></div>'+
+    '<div class="field"><label>Overall idea for the session</label><textarea data-bind="bigIdea" maxlength="2000" placeholder="What real-life tension does this session explore? Why does it matter to you? Jot down whatever comes to mind." style="min-height:220px;">'+esc(d.bigIdea)+'</textarea><div class="hint">This is a brainstorm space for you and your coach — not something parents will see. Get your thoughts down; more detail helps.</div></div>'+
   '</div>'+
   (d.coachNotes.length? renderCoachNotesPreview() : '')+
   '<button class="btn btn-primary" data-action="nav" data-target="storyboard">Next: build your storyboard →</button>';
@@ -2045,7 +2333,6 @@ function renderScenario(){
     '<h3>Challenge questions</h3>'+
     '<div class="qlist">'+chQ+'</div>'+
     (sc.challenge.length<4? '<button class="add-row-btn" data-action="addChallenge">+ Add another challenge question</button>' : '')+
-    '<div class="field" style="margin-top:16px;"><label>Reflection question</label><textarea data-bind="scReflection" maxlength="300" placeholder="Turn it toward your own life or your team today...">'+esc(sc.reflection)+'</textarea></div>'+
   '</div>'+
   '<div class="scenario-nav">'+
     '<button class="btn btn-ghost-light" data-action="prevScenario" '+(i===0?'disabled':'')+'>← Scenario '+i+'</button>'+
@@ -2177,40 +2464,103 @@ function renderPlayerPreview(){
 }
 
 /* ---------- Review ---------- */
-function renderReviewPreview(d){
+// Renders the open (unresolved) editor's notes for one field, plus — for the coach only —
+// the "+ Note" control that adds a new one. `d.id` doubles as the data-id every note
+// action needs to know which draft to write back to.
+function noteBlockHtml(d, fieldKey, opts){
+  var isCoach = !!(opts && opts.coachNotes);
+  var open = openNotesFor(d, fieldKey);
+  var notesHtml = open.map(function(n){
+    return '<div class="field-note">'+
+      '<div class="field-note-text">'+esc(n.text)+'</div>'+
+      '<div class="field-note-meta">'+
+        (isCoach
+          ? '<label class="field-note-done"><input type="checkbox" data-action="toggleNoteResolved" data-id="'+esc(d.id)+'" data-noteid="'+esc(n.id)+'"'+(state.editorNoteBusy?' disabled':'')+'> Mark done</label>'
+          : (timeAgo(n.at)+' · from your coach')
+        )+
+      '</div>'+
+    '</div>';
+  }).join('');
+  if(!isCoach) return notesHtml ? '<div class="field-notes">'+notesHtml+'</div>' : '';
+
+  var controlHtml = state.composingNoteField===fieldKey
+    ? '<div class="field-note-compose">'+
+        '<div class="field-note-compose-label">Note on: '+esc(fieldNoteLabel(fieldKey, d))+'</div>'+
+        '<textarea id="fieldNoteComposeInput" maxlength="500" placeholder="What should they change here?"></textarea>'+
+        '<div class="field-note-compose-actions">'+
+          '<button type="button" class="btn btn-ghost btn-small" data-action="cancelFieldNote">Cancel</button>'+
+          '<button type="button" class="btn btn-primary btn-small" data-action="saveFieldNote" data-id="'+esc(d.id)+'" data-field="'+esc(fieldKey)+'"'+(state.editorNoteBusy?' disabled':'')+'>Save note</button>'+
+        '</div>'+
+      '</div>'
+    : '<button type="button" class="field-note-add-btn" data-action="addFieldNote" data-field="'+esc(fieldKey)+'">+ Note</button>';
+
+  return '<div class="field-notes">'+notesHtml+controlHtml+'</div>';
+}
+function renderReviewPreview(d, opts){
   var scenarioBlocks = d.scenarios.map(function(sc,i){
-    var opts = sc.options.map(function(o,oi){
+    var optsHtml = sc.options.map(function(o,oi){
       var lane = LANES[o.colorIndex];
       var iconHtml = o.selectedIcon
         ? '<img src="'+esc(o.selectedIcon.thumbnailUrl)+'" alt="">'
         : ICON_PLACEHOLDER_SVG;
-      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b><span>'+esc(o.rationale)+'</span>'+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+'</div></div>';
+      var optKeyBase = 'sc:'+sc.id+':opt:'+o.id+':';
+      return '<div class="p-opt" style="--c:'+lane.color+'; --soft:'+lane.soft+'"><span class="p-opt-icon">'+iconHtml+'</span><div><b>'+esc(o.label||'(untitled option)')+'.</b>'+noteBlockHtml(d, optKeyBase+'label', opts)+'<span>'+esc(o.rationale)+'</span>'+noteBlockHtml(d, optKeyBase+'rationale', opts)+(o.iconDescription? '<span class="p-icon-desc">🖼 Icon idea: '+esc(o.iconDescription)+'</span>' : '')+noteBlockHtml(d, optKeyBase+'icon', opts)+'</div></div>';
     }).join('');
     var cqs = sc.challenge.filter(function(q){return q.trim();}).map(function(q){return '<div>'+esc(q)+'</div>';}).join('');
     var block = '<div class="p-scenario"><h4>Scenario '+(i+1)+': '+esc(sc.title||'Untitled')+'<span class="p-preview-link" data-action="openPlayerPreview" data-kind="scenario" data-idx="'+i+'">🖥️ Preview</span></h4>'+
+      noteBlockHtml(d, 'sc:'+sc.id+':title', opts)+
       '<div class="p-setup">'+esc(sc.setup)+'</div>'+
-      '<div class="p-opts">'+opts+'</div>'+
+      noteBlockHtml(d, 'sc:'+sc.id+':setup', opts)+
+      '<div class="p-opts">'+optsHtml+'</div>'+
       (cqs? '<div class="p-q-label">Challenge questions</div><div class="p-cqs">'+cqs+'</div>' : '')+
+      noteBlockHtml(d, 'sc:'+sc.id+':challenge', opts)+
       (sc.reflection? '<div class="p-q-label">Reflection question</div><div class="p-refl">'+esc(sc.reflection)+'</div>' : '')+
     '</div>';
     return block;
   });
   var half = d.halftime, refl = d.reflection;
-  var halftimeBlock = '<div class="p-half"><h4>Halftime</h4><div class="p-setup">'+esc(half.question)+'</div><div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+(half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>':'')+'</div>';
-  var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4><div class="p-setup">'+esc(refl.question)+'</div><div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+(refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>':'')+'</div>';
+  var halftimeBlock = '<div class="p-half"><h4>Halftime</h4><div class="p-setup">'+esc(half.question)+'</div>'+
+    noteBlockHtml(d, 'halftime:question', opts)+
+    '<div class="p-cqs">'+half.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+
+    noteBlockHtml(d, 'halftime:options', opts)+
+    (half.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(half.reflection)+'</div>':'')+
+    noteBlockHtml(d, 'halftime:reflection', opts)+
+  '</div>';
+  var reflectionBlock = '<div class="p-half"><h4>Closing Reflection</h4><div class="p-setup">'+esc(refl.question)+'</div>'+
+    noteBlockHtml(d, 'reflection:question', opts)+
+    '<div class="p-cqs">'+refl.options.filter(function(o){return o.trim();}).map(function(o){return '• '+esc(o);}).join('<br>')+'</div>'+
+    noteBlockHtml(d, 'reflection:options', opts)+
+    (refl.reflection? '<div class="p-q-label">Reflection</div><div class="p-refl">'+esc(refl.reflection)+'</div>':'')+
+    noteBlockHtml(d, 'reflection:reflection', opts)+
+  '</div>';
 
-  var ideaBlock = d.bigIdea ? ('<div class="p-blurb"><span class="p-q-label" style="margin:0 0 4px;">The big idea</span><br>'+esc(d.bigIdea)+'</div>') : '';
+  var ideaBlock = d.bigIdea ? ('<div class="p-blurb p-internal"><span class="p-q-label" style="margin:0 0 4px;">Overall idea — notes for you and your coach, not part of the session</span><br>'+esc(d.bigIdea)+noteBlockHtml(d, 'bigIdea', opts)+'</div>') : '';
 
   return ''+
   '<div class="print-card">'+
     '<div class="p-eyebrow">SYNTHESIS DISCUSSION SESSION</div>'+
     '<h2 class="p-title">'+esc(d.title||'Untitled Session')+'</h2>'+
+    noteBlockHtml(d, 'title', opts)+
     ideaBlock+
     scenarioBlocks.slice(0,3).join('')+
     halftimeBlock+
     scenarioBlocks.slice(3).join('')+
     reflectionBlock+
   '</div>';
+}
+// Single source of truth for the status badge — three call sites (student review, inbox
+// row, coach review) used to each carry their own copy of this ternary, which is how the
+// 'submitted' label ended up drifting ("Waiting for coach" vs "Waiting for review") and
+// why the fallback for an unrecognized status quietly renders as "Reviewed" everywhere.
+function statusMeta(status, audience){
+  var known = status==='draft' || status==='submitted' || status==='revision' || status==='reviewed' || status==='accepted';
+  var cls = 'status-'+(known ? status : 'reviewed');
+  var label = status==='draft' ? 'Drafting'
+    : status==='submitted' ? (audience==='student' ? 'Waiting for coach' : 'Waiting for review')
+    : status==='revision' ? (audience==='student' ? 'Sent back with notes' : 'Needs revision')
+    : status==='accepted' ? 'Accepted ✅'
+    : 'Reviewed';
+  return {cls:cls, label:label};
 }
 function balanceStripHtml(){
   return '<div class="panel"><div class="balance-strip"><div class="bs-title"><span class="b-icon">⚖️</span>Balance self-check</div><ul>'+
@@ -2221,17 +2571,22 @@ function balanceStripHtml(){
 }
 function renderReview(){
   var d = state.draft;
-  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for coach':'Reviewed');
+  var sm = statusMeta(d.status, 'student'), statusCls = sm.cls, statusLabel = sm.label;
+  var accepted = d.status==='accepted';
   var notes = d.coachNotes.length? (
     '<div class="panel"><h3>Notes from your coach</h3><div class="coach-notes">'+
       d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+
     '</div></div>'
   ) : '';
+  var acceptedBanner = accepted ? (
+    '<div class="panel accept-banner"><span class="accept-banner-icon">🎉</span><div><h3>Your session was accepted!</h3>'+
+    '<p>Nice work — your coach is polishing it up now, and then it heads off to the team that builds it into an official Discussion Session.</p></div></div>'
+  ) : '';
   return ''+
   '<div class="page-head"><div class="eyebrow">STEP 4</div><h2>Review &amp; send to your coach</h2><p>Here\'s the full session, put together. This is shared with your coach so they can leave notes.</p></div>'+
   '<div style="margin-bottom:14px;"><span class="status-badge '+statusCls+'">'+statusLabel+'</span></div>'+
   (state.submitError? '<div class="banner">\u26A0\uFE0F '+esc(state.submitError)+'</div>' : '')+
+  acceptedBanner+
   renderReviewPreview(d)+
   notes+
   balanceStripHtml()+
@@ -2243,7 +2598,7 @@ function renderReview(){
     '<h3>Ready?</h3>'+
     '<div class="review-actions">'+
       (AI_ASSISTANT_ENABLED? '<button class="btn btn-ghost" data-action="askCoachWhole">💬 Ask my assistant to review everything</button>' : '')+
-      (d.isExample? '' : '<button class="btn btn-primary" data-action="submitToCoach">Submit to my coach</button>')+
+      (d.isExample || accepted? '' : '<button class="btn btn-primary" data-action="submitToCoach">Submit to my coach</button>')+
       '<button class="btn btn-ghost" data-action="exportMarkdown">⬇ Download as Markdown</button>'+
     '</div>'+
     (d.isExample? '<div class="hint" style="margin-top:12px;">This is an example, so there\'s nothing to send. Head home to start a session of your own — you can still download this one to keep.</div>' : '')+
@@ -2254,8 +2609,7 @@ function renderReview(){
 // One row's markup — pulled out so the three priority groups below render
 // identically instead of three copies of the same template drifting apart.
 function renderInboxRow(d){
-  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
+  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.label;
   return ''+
   '<div class="inbox-row" data-action="openInboxDraft" data-id="'+esc(d.id)+'">'+
     '<div class="ir-left"><h4>'+esc(d.title||'Untitled')+' — <span style="font-weight:400;">'+esc(d.studentName)+'</span></h4><p>CODE '+esc(d.id)+' · updated '+timeAgo(d.updatedAt)+'</p></div>'+
@@ -2267,27 +2621,60 @@ function renderInboxRow(d){
 }
 // A submitted draft is the only one waiting on the coach to do anything, so it leads;
 // a still-drafting one has no action pending yet; a reviewed one is done. Each group
-// keeps listAllDrafts' existing most-recently-updated-first order.
-function renderInboxGroup(label, list){
+// keeps listAllDrafts' existing most-recently-updated-first order. rowFn defaults to
+// renderInboxRow (draft: records); the Pending/Past-sessions groups pass renderPendingRow
+// instead, since those rows come from pending: records with a different shape.
+function renderInboxGroup(label, list, rowFn){
   if(!list.length) return '';
   return '<div class="inbox-group">'+
     '<h3 style="color:#fff; font-size:14px; margin-bottom:10px; opacity:.75;">'+esc(label)+' ('+list.length+')</h3>'+
-    list.map(renderInboxRow).join('')+
+    list.map(rowFn || renderInboxRow).join('')+
+  '</div>';
+}
+// One "Week of <date>" entry reads better than the raw ISO string a <input type="date">
+// hands back — this is display-only, the stored value stays the plain "YYYY-MM-DD".
+function formatWeekOf(isoDate){
+  var dt = new Date(isoDate+'T00:00:00');
+  if(isNaN(dt.getTime())) return isoDate;
+  return dt.toLocaleDateString(undefined, {month:'short', day:'numeric', year:'numeric'});
+}
+function renderPendingRow(p){
+  var isShipped = p.status==='shipped';
+  var statusLine = isShipped
+    ? ('Sent to code '+timeAgo(p.sentToCodeAt)+(p.usageWeeks.length? ' · used '+p.usageWeeks.length+'×' : ''))
+    : 'Accepted '+timeAgo(p.createdAt)+' — ready to polish';
+  return ''+
+  '<div class="inbox-row" data-action="openPendingDraft" data-id="'+esc(p.id)+'">'+
+    '<div class="ir-left"><h4>'+esc(p.title||'Untitled')+' — <span style="font-weight:400;">'+esc(p.studentName)+'</span></h4><p>CODE '+esc(p.id)+' · '+esc(statusLine)+'</p></div>'+
+    '<span class="status-badge '+(isShipped?'status-reviewed':'status-submitted')+'">'+(isShipped?'Shipped':'Pending')+'</span>'+
   '</div>';
 }
 function renderShellInbox(){
   var submitted = state.inboxList.filter(function(d){ return d.status==='submitted'; });
+  var needsRevision = state.inboxList.filter(function(d){ return d.status==='revision'; });
   var inProgress = state.inboxList.filter(function(d){ return d.status==='draft'; });
   var reviewed = state.inboxList.filter(function(d){ return d.status==='reviewed'; });
-  var rows = state.inboxList.length ? (
+  var pendingRows = state.pendingList.filter(function(p){ return p.status==='pending'; });
+  var shippedRows = state.pendingList.filter(function(p){ return p.status==='shipped'; });
+  var rows = (state.inboxList.length || state.pendingList.length) ? (
     renderInboxGroup('Ready for review', submitted)+
+    renderInboxGroup('Needs revision', needsRevision)+
     renderInboxGroup('In progress', inProgress)+
+    renderInboxGroup('Pending polish', pendingRows, renderPendingRow)+
     renderInboxGroup('Reviewed', reviewed)
   ) : (state.inboxLoading
     ? '<div class="empty-state">Loading drafts…</div>'
     : (state.inboxError
       ? ''
       : '<div class="empty-state">No drafts yet. Once a student starts a session, it\'ll show up here.</div>'));
+  // A separate section, not another priority group — a shipped session isn't waiting on
+  // the coach for anything; it's an archive they occasionally add a "used again" date to.
+  var pastSection = shippedRows.length ? (
+    '<div style="margin-top:34px;">'+
+      '<h3 style="color:#fff; font-size:16px; margin-bottom:12px;">📚 Past sessions ('+shippedRows.length+')</h3>'+
+      shippedRows.map(renderPendingRow).join('')+
+    '</div>'
+  ) : '';
   var errorBanner = state.inboxError ? '<div class="banner">⚠️ '+esc(state.inboxError)+'</div>' : '';
 
   var activeFlags = (state.flaggedList||[]).filter(function(m){ return m.locked; });
@@ -2318,6 +2705,7 @@ function renderShellInbox(){
     errorBanner+
     flaggedSection+
     rows+
+    pastSection+
   '</div>';
 }
 function renderShellInboxFeedback(){
@@ -2382,29 +2770,124 @@ function renderShellInboxFlagged(){
 function renderShellInboxDraft(){
   var d = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
   if(!d) return renderShellInbox();
-  var statusCls = d.status==='draft'?'status-draft':(d.status==='submitted'?'status-submitted':'status-reviewed');
-  var statusLabel = d.status==='draft'?'Drafting':(d.status==='submitted'?'Waiting for review':'Reviewed');
+  var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.label;
   return ''+
-  '<div class="home-wrap" style="padding-top:44px; max-width:760px;">'+
+  '<div class="home-wrap inbox-draft-wrap">'+
     '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
     '<div style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">'+
       '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
       '<button class="btn btn-ghost btn-small" data-action="exportMarkdownInbox" data-id="'+esc(d.id)+'">⬇ Download as Markdown</button>'+
     '</div>'+
-    renderReviewPreview(d)+
+    renderReviewPreview(d, {coachNotes:true})+
     (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
     '<div class="panel">'+
       '<h3>Leave feedback for '+esc(d.studentName)+'</h3>'+
-      '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass?"></textarea></div>'+
+      '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass? (Accepting sends this along as a congratulatory note.)"></textarea></div>'+
       '<div class="review-actions">'+
-        '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back for revisions</button>'+
-        '<button class="btn btn-primary" data-action="markReviewed" data-id="'+esc(d.id)+'">Mark reviewed ✅</button>'+
+        '<button class="btn btn-ghost" data-action="sendBackForRevision" data-id="'+esc(d.id)+'">Send back with notes</button>'+
         // The two seeded examples are reference material, not a student's own work —
-        // keep them out of reach here rather than let a stray click remove them.
+        // accepting one would spin off a stray pending:EXAMPLE-* record, so keep both
+        // that and delete out of reach here rather than let a stray click do either.
+        (isSeededExampleId(d.id) ? '' : '<button class="btn btn-primary" data-action="acceptDraft" data-id="'+esc(d.id)+'">Accepted ✅</button>')+
         (isSeededExampleId(d.id) ? '' : '<button class="btn btn-ghost" data-action="deleteInboxDraft" data-id="'+esc(d.id)+'" style="margin-left:auto; color:#C0463A;">🗑️ Delete</button>')+
       '</div>'+
     '</div>'+
+  '</div>';
+}
+
+/* ============================= PENDING (coach polish, post-acceptance) ============================= */
+// The one long-scrolling form a coach polishes before shipping — see newPendingFromDraft
+// for how it's built and updatePendingField/data-pbind for how edits get wired up.
+function pendingCheckinBlockHtml(block, prefix, heading, locked){
+  var optsRows = block.options.map(function(o, oi){
+    return '<div class="qrow"><input type="text" data-pbind="'+prefix+'Opt" data-oidx="'+oi+'" maxlength="200" value="'+esc(o)+'"'+(locked?' disabled':'')+'></div>';
+  }).join('');
+  return ''+
+  '<div class="panel">'+
+    '<h3>'+esc(heading)+'</h3>'+
+    '<div class="field"><label>Question</label><textarea data-pbind="'+prefix+'Q" maxlength="300"'+(locked?' disabled':'')+'>'+esc(block.question)+'</textarea></div>'+
+    '<div class="field"><label>Options</label><div class="qlist">'+optsRows+'</div></div>'+
+    '<div class="field"><label>'+(prefix==='halftime'?'Forward-looking line':'Closing line')+'</label><textarea data-pbind="'+prefix+'Refl" maxlength="300"'+(locked?' disabled':'')+'>'+esc(block.reflection)+'</textarea></div>'+
+  '</div>';
+}
+function renderPendingScreen(){
+  var p = state.pendingDraft;
+  if(!p){
+    return '<div class="home-wrap inbox-draft-wrap">'+
+      '<button class="btn btn-ghost-light btn-small" data-action="closePendingDraft" style="margin-bottom:16px;">← All drafts</button>'+
+      '<div class="empty-state">Loading…</div>'+
+    '</div>';
+  }
+  var locked = p.status==='shipped';
+
+  var scenarioBlocks = p.scenarios.map(function(sc, i){
+    var optsHtml = sc.options.map(function(o, oi){
+      var lane = LANES[o.colorIndex];
+      return ''+
+      '<div class="pending-option" style="--c:'+lane.color+'; --soft:'+lane.soft+'">'+
+        '<div class="field"><label>Option '+(oi+1)+' label</label><input type="text" data-pbind="optLabel" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="60" value="'+esc(o.label)+'"'+(locked?' disabled':'')+'></div>'+
+        '<div class="field"><label>Why</label><textarea data-pbind="optRationale" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="400"'+(locked?' disabled':'')+'>'+esc(o.rationale)+'</textarea></div>'+
+        '<div class="field"><label>Icon idea</label><input type="text" data-pbind="optIcon" data-sidx="'+i+'" data-oidx="'+oi+'" maxlength="80" value="'+esc(o.iconDescription)+'"'+(locked?' disabled':'')+'></div>'+
+      '</div>';
+    }).join('');
+    var chHtml = sc.challenge.map(function(q, qi){
+      return '<div class="qrow"><input type="text" data-pbind="challenge" data-sidx="'+i+'" data-qidx="'+qi+'" maxlength="300" value="'+esc(q)+'"'+(locked?' disabled':'')+'></div>';
+    }).join('');
+    return ''+
+    '<div class="panel">'+
+      '<h3>Scenario '+(i+1)+' <span class="hint-inline">'+esc(sc.domain||'no domain set')+'</span></h3>'+
+      '<div class="field"><label>Title</label><input type="text" data-pbind="scTitle" data-sidx="'+i+'" maxlength="80" value="'+esc(sc.title)+'"'+(locked?' disabled':'')+'></div>'+
+      '<div class="field"><label>Setup</label><textarea data-pbind="scSetup" data-sidx="'+i+'" maxlength="600"'+(locked?' disabled':'')+'>'+esc(sc.setup)+'</textarea></div>'+
+      '<div class="pending-options">'+optsHtml+'</div>'+
+      '<div class="field" style="margin-top:12px;"><label>Challenge questions</label><div class="qlist">'+chHtml+'</div></div>'+
+      '<div class="field"><label>Reflection question <span class="hint-inline">(coach-written — never shown to the student)</span></label><textarea data-pbind="scReflection" data-sidx="'+i+'" maxlength="300"'+(locked?' disabled':'')+'>'+esc(sc.reflection)+'</textarea></div>'+
+    '</div>';
+  });
+
+  var usageWeeksHtml = (p.usageWeeks||[]).slice().sort().map(function(w){
+    return '<div class="usage-week-row"><span>Week of '+esc(formatWeekOf(w))+'</span>'+
+      '<button type="button" class="btn-icon" data-action="removeUsageWeek" data-week="'+esc(w)+'" title="Remove">✕</button></div>';
+  }).join('');
+
+  var shipControls = locked
+    ? '<div class="hint">Sent to code '+timeAgo(p.sentToCodeAt)+'.</div>'
+    : (''+
+        '<button type="button" class="btn btn-ghost" disabled title="Coming soon — will export directly to the session code / Notion">🚀 Ship to code — coming soon!</button>'+
+        '<button type="button" class="btn btn-primary" data-action="markSentToCode" data-id="'+esc(p.id)+'">✓ Mark as sent to code</button>'
+      );
+
+  var blurbMissingMantra = !locked && p.parentBlurb.trim() && p.parentBlurb.indexOf(MANTRA)===-1;
+
+  return ''+
+  '<div class="home-wrap inbox-draft-wrap">'+
+    '<button class="btn btn-ghost-light btn-small" data-action="closePendingDraft" style="margin-bottom:16px;">← All drafts</button>'+
+    '<div style="margin-bottom:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">'+
+      '<span class="status-badge '+(locked?'status-reviewed':'status-submitted')+'">'+(locked?'Shipped':'Pending')+'</span>'+
+      (locked? '' : '<span id="pendingSaveIndicator" class="rail-save-indicator '+pendingSaveStatus+'">'+saveStatusText(pendingSaveStatus)+'</span>')+
+    '</div>'+
+    '<div class="page-head"><h2>'+esc(p.title||'Untitled')+' <span style="font-weight:400; font-size:16px; color:var(--ink-soft);">— '+esc(p.studentName)+'</span></h2></div>'+
+    (p.bigIdea ? ('<div class="panel" style="background:#F0EBDA;"><h3>Original overall idea <span class="hint-inline">(the student\'s brainstorm — reference only, not part of the session)</span></h3><p style="font-size:13.5px; line-height:1.5; white-space:pre-wrap;">'+esc(p.bigIdea)+'</p></div>') : '')+
+    '<div class="panel">'+
+      '<h3>Title</h3>'+
+      '<div class="field"><input type="text" data-pbind="title" maxlength="80" value="'+esc(p.title)+'"'+(locked?' disabled':'')+'></div>'+
+    '</div>'+
+    '<div class="panel">'+
+      '<h3>Parent blurb</h3>'+
+      '<div class="hint" style="margin-bottom:8px;">This is what parents actually see. Close with: "'+MANTRA+'"</div>'+
+      '<div class="field"><textarea id="pendingParentBlurbInput" data-pbind="parentBlurb" maxlength="2000" style="min-height:140px;"'+(locked?' disabled':'')+'>'+esc(p.parentBlurb)+'</textarea></div>'+
+      '<div class="banner" id="pendingParentBlurbWarning"'+(blurbMissingMantra?'':' hidden')+'>⚠️ Doesn\'t close with the standard line yet.</div>'+
+    '</div>'+
+    scenarioBlocks.slice(0,3).join('')+
+    pendingCheckinBlockHtml(p.halftime, 'halftime', 'Halftime', locked)+
+    scenarioBlocks.slice(3).join('')+
+    pendingCheckinBlockHtml(p.reflection, 'reflection', 'Closing reflection', locked)+
+    '<div class="panel">'+
+      '<h3>Used in sessions</h3>'+
+      (usageWeeksHtml || '<div class="hint" style="margin-bottom:10px;">Not used yet.</div>')+
+      '<div class="usage-week-add"><input type="date" id="usageWeekInput"><button type="button" class="btn btn-ghost btn-small" data-action="addUsageWeek" data-id="'+esc(p.id)+'">+ Add a week used</button></div>'+
+    '</div>'+
+    '<div class="panel"><div class="review-actions">'+shipControls+'</div></div>'+
   '</div>';
 }
 
@@ -2659,6 +3142,115 @@ function startNoteDrag(e, note){
 }
 function removeNotesOverlay(){
   var existing = document.getElementById('notesOverlayRoot');
+  if(existing) existing.remove();
+}
+
+/* ---------- Coach editor's notes, student-facing overlay ----------
+   Same idea as the sticky-note dock above, but the notes come from the coach (stored on
+   the draft, see newEditorNote) and are read-only, draggable-only — no delete, no color.
+   A separate #editorNotesOverlayRoot so this never fights with renderStickyLayer's full
+   innerHTML replacement of #notesOverlayRoot. */
+var EDITOR_NOTE_W = 200, EDITOR_NOTE_H = 120;
+var editorNoteZCounter = 46;
+function editorNotesForScreen(d){
+  if(!d) return [];
+  return (d.editorNotes||[]).filter(function(n){
+    if(n.resolvedAt) return false;
+    var loc = screenForFieldKey(n.field, d);
+    if(!loc || loc.screen !== state.screen) return false;
+    if(loc.screen==='scenario' && loc.scenarioIndex !== state.scenarioIndex) return false;
+    return true;
+  });
+}
+// Finds the DOM field a note is attached to, so a freshly-arrived note can drop in next
+// to the thing it's actually about instead of a generic corner of the screen.
+function editorNoteAnchorEl(n, d){
+  var p = parseFieldKey(n.field);
+  var sel = null;
+  if(p.kind==='setup') sel = '[data-bind="'+(p.sub==='title'?'title':'bigIdea')+'"]';
+  else if(p.kind==='halftime') sel = '[data-bind="'+(p.sub==='question'?'halftimeQ':(p.sub==='options'?'halftimeOpt':'halftimeRefl'))+'"]';
+  else if(p.kind==='reflection') sel = '[data-bind="'+(p.sub==='question'?'reflectionQ':(p.sub==='options'?'reflectionOpt':'reflectionRefl'))+'"]';
+  else if(p.kind==='scenario') sel = '[data-bind="'+(p.sub==='title'?'scTitle':(p.sub==='setup'?'scSetup':'challenge'))+'"]';
+  else if(p.kind==='scenarioOption'){
+    var idx = scenarioIndexById(d, p.scenarioId);
+    var sc = idx===-1 ? null : d.scenarios[idx];
+    var oi = sc ? optionIndexById(sc, p.optionId) : -1;
+    if(oi===-1) return null;
+    var bindName = p.sub==='label' ? 'option.label' : (p.sub==='rationale' ? 'option.rationale' : 'option.iconDescription');
+    sel = '[data-bind="'+bindName+'"][data-oidx="'+oi+'"]';
+  }
+  return sel ? document.querySelector(sel) : null;
+}
+function placeEditorNoteIfNeeded(n, d){
+  if(n.x!=null && n.y!=null) return;
+  var el = editorNoteAnchorEl(n, d);
+  var x, y;
+  if(el){
+    var r = el.getBoundingClientRect();
+    x = r.right + 16; y = r.top;
+  } else {
+    x = window.innerWidth - EDITOR_NOTE_W - 24; y = 120;
+  }
+  n.x = clamp(x, 0, window.innerWidth-EDITOR_NOTE_W);
+  n.y = clamp(y, 0, window.innerHeight-EDITOR_NOTE_H);
+  n.z = ++editorNoteZCounter;
+  debounceSave();
+}
+function renderEditorNote(n){
+  return ''+
+  '<div class="editor-note" data-editornoteid="'+n.id+'" style="left:'+n.x+'px; top:'+n.y+'px; z-index:'+(n.z||editorNoteZCounter)+'">'+
+    '<div class="editor-note-drag" data-drag-editornote="'+n.id+'" title="Drag to move">'+DRAG_HANDLE_SVG+'</div>'+
+    '<div class="editor-note-text">'+esc(n.text)+'</div>'+
+    '<div class="editor-note-byline">— Your coach</div>'+
+  '</div>';
+}
+function renderEditorNoteLayer(){
+  var d = state.draft;
+  var notes = editorNotesForScreen(d);
+  notes.forEach(function(n){ placeEditorNoteIfNeeded(n, d); });
+  var html = notes.map(renderEditorNote).join('');
+  var wrap = document.getElementById('editorNotesOverlayRoot');
+  if(!wrap){
+    wrap = document.createElement('div');
+    wrap.id = 'editorNotesOverlayRoot';
+    document.body.appendChild(wrap);
+  }
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('[data-drag-editornote]').forEach(function(handle){
+    handle.addEventListener('pointerdown', function(e){
+      var note = notes.filter(function(n){ return n.id===handle.getAttribute('data-drag-editornote'); })[0];
+      if(note) startEditorNoteDrag(e, note);
+    });
+  });
+}
+// Deliberately simpler than startNoteDrag: no trash target (students can't delete these),
+// no handle-occlusion pass (a coach rarely leaves more than one open note per field), and
+// it commits through the normal draft autosave since editorNotes lives on the draft record
+// itself rather than the separate private-notes store.
+function startEditorNoteDrag(e, note){
+  e.preventDefault();
+  note.z = ++editorNoteZCounter;
+  var startX = e.clientX, startY = e.clientY, origX = note.x, origY = note.y;
+  var el = document.querySelector('.editor-note[data-editornoteid="'+note.id+'"]');
+  if(el) el.style.zIndex = note.z;
+  function onMove(ev){
+    note.x = clamp(origX + (ev.clientX-startX), 0, window.innerWidth-EDITOR_NOTE_W);
+    note.y = clamp(origY + (ev.clientY-startY), 0, window.innerHeight-EDITOR_NOTE_H);
+    if(el){ el.style.left = note.x+'px'; el.style.top = note.y+'px'; }
+  }
+  function onUp(ev){
+    window.removeEventListener('pointermove', onMove);
+    window.removeEventListener('pointerup', onUp);
+    window.removeEventListener('pointercancel', onCancel);
+    debounceSave();
+  }
+  function onCancel(ev){ onUp(ev); }
+  window.addEventListener('pointermove', onMove);
+  window.addEventListener('pointerup', onUp);
+  window.addEventListener('pointercancel', onCancel);
+}
+function removeEditorNotesOverlay(){
+  var existing = document.getElementById('editorNotesOverlayRoot');
   if(existing) existing.remove();
 }
 
@@ -2922,15 +3514,23 @@ function toMarkdown(d){
 }
 
 /* ============================= EVENT HANDLING ============================= */
+// Once a coach accepts a draft, the student's copy is frozen — see acceptDraft — so
+// their edits don't drift away from the pending polish snapshot the coach is now
+// working from. render() also disables every input/textarea/select on a locked draft's
+// screens; this is the belt to that suspenders, in case a stale/disabled element's
+// input event still manages to fire.
+function isDraftLocked(d){
+  return !!(d && d.status==='accepted');
+}
 function updateDraftField(bind, el, oidx, qidx){
   var d = state.draft;
+  if(isDraftLocked(d)) return;
   var v = el.value;
   if(bind==='title') d.title=v;
   else if(bind==='bigIdea') d.bigIdea=v;
   else if(bind==='scTitle') d.scenarios[state.scenarioIndex].title=v;
   else if(bind==='scDomain') d.scenarios[state.scenarioIndex].domain=v;
   else if(bind==='scSetup') d.scenarios[state.scenarioIndex].setup=v;
-  else if(bind==='scReflection') d.scenarios[state.scenarioIndex].reflection=v;
   else if(bind==='option.label') d.scenarios[state.scenarioIndex].options[oidx].label=v;
   else if(bind==='option.rationale') d.scenarios[state.scenarioIndex].options[oidx].rationale=v;
   else if(bind==='option.iconDescription') d.scenarios[state.scenarioIndex].options[oidx].iconDescription=v;
@@ -2942,6 +3542,30 @@ function updateDraftField(bind, el, oidx, qidx){
   else if(bind==='reflectionRefl') d.reflection.reflection=v;
   else if(bind==='reflectionOpt') d.reflection.options[oidx]=v;
   else if(bind==='coachMessage') d.coachMessage=v;
+}
+// Parallel to updateDraftField, but for the coach's pending-polish screen — separate
+// bind namespace (data-pbind) and a scenario index carried explicitly (data-sidx) since,
+// unlike the student's one-scenario-per-screen editor, the whole session is one long
+// scrolling page here.
+function updatePendingField(bind, el, sidx, oidx, qidx){
+  var p = state.pendingDraft;
+  if(!p || p.status==='shipped') return;
+  var v = el.value;
+  if(bind==='title') p.title=v;
+  else if(bind==='parentBlurb') p.parentBlurb=v;
+  else if(bind==='scTitle') p.scenarios[sidx].title=v;
+  else if(bind==='scSetup') p.scenarios[sidx].setup=v;
+  else if(bind==='scReflection') p.scenarios[sidx].reflection=v;
+  else if(bind==='challenge') p.scenarios[sidx].challenge[qidx]=v;
+  else if(bind==='optLabel') p.scenarios[sidx].options[oidx].label=v;
+  else if(bind==='optRationale') p.scenarios[sidx].options[oidx].rationale=v;
+  else if(bind==='optIcon') p.scenarios[sidx].options[oidx].iconDescription=v;
+  else if(bind==='halftimeQ') p.halftime.question=v;
+  else if(bind==='halftimeOpt') p.halftime.options[oidx]=v;
+  else if(bind==='halftimeRefl') p.halftime.reflection=v;
+  else if(bind==='reflectionQ') p.reflection.question=v;
+  else if(bind==='reflectionOpt') p.reflection.options[oidx]=v;
+  else if(bind==='reflectionRefl') p.reflection.reflection=v;
 }
 
 function attachGlobalHandlers(){
@@ -2986,6 +3610,28 @@ function attachGlobalHandlers(){
       render();
     });
   });
+  // Coach pending-polish screen — same shape as the data-bind wiring above, its own
+  // namespace so it can carry a scenario index (data-sidx) the student's editor never
+  // needs (only one scenario is ever on screen there).
+  app.querySelectorAll('input[data-pbind], textarea[data-pbind]').forEach(function(el){
+    el.addEventListener('input', function(){
+      var bind = el.getAttribute('data-pbind');
+      var sidx = el.getAttribute('data-sidx');
+      var oidx = el.getAttribute('data-oidx');
+      var qidx = el.getAttribute('data-qidx');
+      updatePendingField(bind, el, sidx!==null?parseInt(sidx,10):null, oidx!==null?parseInt(oidx,10):null, qidx!==null?parseInt(qidx,10):null);
+      debouncePendingSave();
+    });
+  });
+  // Live "doesn't close with the standard line yet" warning on the parent blurb —
+  // a targeted toggle rather than a full render(), so typing doesn't lose the cursor.
+  var blurbEl = document.getElementById('pendingParentBlurbInput');
+  if(blurbEl){
+    blurbEl.addEventListener('input', function(){
+      var warn = document.getElementById('pendingParentBlurbWarning');
+      if(warn) warn.hidden = !blurbEl.value.trim() || blurbEl.value.indexOf(MANTRA)!==-1;
+    });
+  }
 }
 function attachAppDelegatesOnce(){
   app.addEventListener('click', handleClick);
@@ -3048,10 +3694,18 @@ function enterDraft(d, startScreen){
   });
 }
 
+// Structural edits an accepted, frozen draft shouldn't accept even though the disabled-
+// input pass in render() only covers text/select fields, not these action buttons.
+// Navigation, preview, export, and goHome are deliberately not in this list — a locked
+// draft is read-only, not unreachable.
+var LOCKED_DRAFT_ACTIONS = ['moveScenario','moveLane','addChallenge','removeChallenge','setOptionCount',
+  'addreflectionOpt','removereflectionOpt','addhalftimeOpt','removehalftimeOpt','clearIcon','searchIcon',
+  'selectIcon','dismissIconSearch','submitToCoach'];
 function handleClick(e){
   var t = e.target.closest('[data-action]');
   if(!t) return;
   var action = t.getAttribute('data-action');
+  if(state.draft && isDraftLocked(state.draft) && LOCKED_DRAFT_ACTIONS.indexOf(action)!==-1) return;
 
   if(action==='startNew'){
     var name = window.storage.studentUsername();
@@ -3138,7 +3792,7 @@ function handleClick(e){
     enterDraft(exampleDraft, 'storyboard');
     return;
   }
-  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; state.feedbackSent=false; state.feedbackError=''; state.feedbackSending=false; removeNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
+  if(action==='goHome'){ if(state.draft) saveDraft(); if(notesDirty) saveNotes(); state.draft=null; state.moderation=null; state.notes=[]; selectedNoteId=null; state.resumeMatches=[]; state.submitError=''; state.feedbackSent=false; state.feedbackError=''; state.feedbackSending=false; removeNotesOverlay(); removeEditorNotesOverlay(); state.screen='home'; state.coachOpen=false; removeCoachOverlay(); render(); refreshMyDrafts(); return; }
   if(action==='openFeedback'){ state.feedbackSent=false; state.feedbackError=''; state.screen='feedback'; render(); return; }
   if(action==='submitFeedback'){
     var likesEl = document.getElementById('feedbackLikes');
@@ -3271,19 +3925,19 @@ function handleClick(e){
     });
     return;
   }
-  if(action==='sendBackForRevision' || action==='markReviewed'){
-    var id = t.getAttribute('data-id');
-    var fbEl = document.getElementById('coachFeedbackText');
-    var text = fbEl ? fbEl.value.trim() : '';
-    loadDraft(id).then(function(d){
+  if(action==='sendBackForRevision'){
+    var revisionId = t.getAttribute('data-id');
+    var revisionFbEl = document.getElementById('coachFeedbackText');
+    var revisionText = revisionFbEl ? revisionFbEl.value.trim() : '';
+    loadDraft(revisionId).then(function(d){
       if(!d){
         state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
         state.screen='inbox';
         render();
         return;
       }
-      if(text) d.coachNotes.push({text:text, at:Date.now()});
-      d.status = action==='markReviewed' ? 'reviewed' : 'draft';
+      if(revisionText) d.coachNotes.push({text:revisionText, at:Date.now()});
+      d.status = 'revision';
       d.updatedAt = Date.now();
       return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
         return listAllDrafts();
@@ -3301,11 +3955,206 @@ function handleClick(e){
     });
     return;
   }
+  // Accepting freezes the student's draft (see isDraftLocked) and spins off a separate
+  // pending:<id> snapshot the coach polishes on its own — see newPendingFromDraft. Both
+  // writes have to land for this to be consistent; if the second one fails after the
+  // first succeeds, the draft would show "Accepted" with no matching Pending row, which
+  // is why the error path here specifically says to check the Pending list before retrying.
+  if(action==='acceptDraft'){
+    var acceptId = t.getAttribute('data-id');
+    var acceptFbEl = document.getElementById('coachFeedbackText');
+    var acceptText = acceptFbEl ? acceptFbEl.value.trim() : '';
+    loadDraft(acceptId).then(function(d){
+      if(!d){
+        state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
+        state.screen='inbox';
+        render();
+        return;
+      }
+      if(acceptText) d.coachNotes.push({text:acceptText, at:Date.now()});
+      d.status = 'accepted';
+      d.acceptedAt = Date.now();
+      d.updatedAt = Date.now();
+      var pending = newPendingFromDraft(d);
+      return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+        return window.storage.set('pending:'+pending.id, JSON.stringify(pending), true);
+      }).then(function(){
+        return Promise.all([listAllDrafts(), listAllPending()]);
+      }).then(function(results){
+        state.inboxList = results[0];
+        state.pendingList = results[1];
+        state.screen='inbox';
+        render();
+      });
+    }).catch(function(e){
+      console.error('accept failed', e);
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError='Couldn\'t accept that draft — it may not have gone through. Check the Pending list before retrying, in case only part of it saved.';
+      state.screen='inbox';
+      render();
+    });
+    return;
+  }
+
+  // Per-field editor's notes — see noteBlockHtml. Unlike send-back/mark-reviewed, these
+  // stay on the same draft's review page rather than returning to the inbox list, so a
+  // coach can add several notes in one pass.
+  if(action==='addFieldNote'){
+    state.composingNoteField = t.getAttribute('data-field');
+    render();
+    var composeEl = document.getElementById('fieldNoteComposeInput');
+    if(composeEl) composeEl.focus();
+    return;
+  }
+  if(action==='cancelFieldNote'){
+    state.composingNoteField = null;
+    render();
+    return;
+  }
+  if(action==='saveFieldNote'){
+    var noteField = t.getAttribute('data-field');
+    var noteDraftId = t.getAttribute('data-id');
+    var composeInput = document.getElementById('fieldNoteComposeInput');
+    var noteText = composeInput ? composeInput.value.trim() : '';
+    if(!noteText){ state.composingNoteField = null; render(); return; }
+    state.editorNoteBusy = true;
+    render();
+    loadDraft(noteDraftId).then(function(d){
+      if(!d){
+        state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
+        state.editorNoteBusy = false;
+        state.composingNoteField = null;
+        state.screen = 'inbox';
+        render();
+        return;
+      }
+      d.editorNotes.push(newEditorNote(noteField, noteText));
+      d.updatedAt = Date.now();
+      return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+        return listAllDrafts();
+      }).then(function(list){
+        state.inboxList = list;
+        state.composingNoteField = null;
+        state.editorNoteBusy = false;
+        render();
+      });
+    }).catch(function(e){
+      console.error('save field note failed', e);
+      state.editorNoteBusy = false;
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = 'Couldn\'t save that note — it may not have gone through. Try again in a moment.';
+      render();
+    });
+    return;
+  }
+  if(action==='toggleNoteResolved'){
+    var resolveDraftId = t.getAttribute('data-id');
+    var resolveNoteId = t.getAttribute('data-noteid');
+    var resolveChecked = t.checked;
+    state.editorNoteBusy = true;
+    render();
+    loadDraft(resolveDraftId).then(function(d){
+      if(!d){
+        state.inboxError = 'Couldn\'t find that draft — it may have been deleted. Try again from the drafts list.';
+        state.editorNoteBusy = false;
+        state.screen = 'inbox';
+        render();
+        return;
+      }
+      var note = d.editorNotes.filter(function(n){ return n.id===resolveNoteId; })[0];
+      if(note) note.resolvedAt = resolveChecked ? Date.now() : null;
+      d.updatedAt = Date.now();
+      return window.storage.set('draft:'+d.id, JSON.stringify(d), true).then(function(){
+        return listAllDrafts();
+      }).then(function(list){
+        state.inboxList = list;
+        state.editorNoteBusy = false;
+        render();
+      });
+    }).catch(function(e){
+      console.error('toggle note resolved failed', e);
+      state.editorNoteBusy = false;
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = 'Couldn\'t update that note — it may not have gone through. Try again in a moment.';
+      render();
+    });
+    return;
+  }
 
   if(action==='exportMarkdownInbox'){
     var exportId = t.getAttribute('data-id');
     var exportDraft = state.inboxList.filter(function(x){return x.id===exportId;})[0];
     if(exportDraft) downloadText((exportDraft.title||'session').toLowerCase().replace(/[^a-z0-9]+/g,'_')+'.md', toMarkdown(exportDraft));
+    return;
+  }
+
+  // Pending polish screen — see renderPendingScreen/updatePendingField for the editing
+  // side; these four handle navigation in/out and the two record-level actions (usage
+  // weeks, marking shipped) that aren't just a text field.
+  if(action==='openPendingDraft'){
+    var openPendingId = t.getAttribute('data-id');
+    state.pendingSelectedId = openPendingId;
+    state.pendingDraft = null;
+    state.screen = 'pendingDraft';
+    render();
+    loadPending(openPendingId).then(function(p){
+      if(!p){
+        state.inboxError = 'Couldn\'t find that session — it may have been deleted.';
+        state.screen = 'inbox';
+        render();
+        return;
+      }
+      state.pendingDraft = p;
+      render();
+    }).catch(function(e){
+      console.error('load pending failed', e);
+      if(e && e.authRequired){ requireCoachSignIn('Your coach session expired. Please sign in again.'); return; }
+      state.inboxError = 'Couldn\'t load that session — try again in a moment.';
+      state.screen = 'inbox';
+      render();
+    });
+    return;
+  }
+  if(action==='closePendingDraft'){
+    var finishClosingPending = function(){
+      listAllPending().then(function(list){
+        state.pendingList = list;
+        state.screen = 'inbox';
+        render();
+      });
+    };
+    if(state.pendingDraft && pendingDirty){
+      savePendingDraft().then(finishClosingPending);
+    } else {
+      finishClosingPending();
+    }
+    return;
+  }
+  if(action==='addUsageWeek'){
+    var weekInput = document.getElementById('usageWeekInput');
+    var weekVal = weekInput ? weekInput.value : '';
+    if(!weekVal || !state.pendingDraft) return;
+    if(state.pendingDraft.usageWeeks.indexOf(weekVal)===-1){
+      state.pendingDraft.usageWeeks.push(weekVal);
+      debouncePendingSave();
+    }
+    render();
+    return;
+  }
+  if(action==='removeUsageWeek'){
+    var weekToRemove = t.getAttribute('data-week');
+    if(!state.pendingDraft) return;
+    state.pendingDraft.usageWeeks = state.pendingDraft.usageWeeks.filter(function(w){ return w!==weekToRemove; });
+    debouncePendingSave();
+    render();
+    return;
+  }
+  if(action==='markSentToCode'){
+    if(!state.pendingDraft) return;
+    if(!window.confirm('Mark this session as sent to code? It will move to Past sessions.')) return;
+    state.pendingDraft.status = 'shipped';
+    state.pendingDraft.sentToCodeAt = Date.now();
+    savePendingDraft().then(function(){ render(); });
     return;
   }
 
@@ -3580,15 +4429,26 @@ window.addEventListener('resize', function(){
   // no notes are on screen, or the next render clamps against stale bounds. On iOS
   // this also fires when the URL bar collapses, which is what kept notes jumping.
   syncStickySize();
-  if(!document.getElementById('notesOverlayRoot')) return;
-  var changed = false;
-  state.notes.forEach(function(n){
-    if(n.x==null || n.y==null) return;
-    var nx = clamp(n.x, 0, window.innerWidth-STICKY_W);
-    var ny = clamp(n.y, 0, window.innerHeight-STICKY_H);
-    if(nx!==n.x || ny!==n.y){ n.x=nx; n.y=ny; changed=true; }
-  });
-  if(changed){ renderStickyLayer(); debounceSaveNotes(); }
+  if(document.getElementById('notesOverlayRoot')){
+    var changed = false;
+    state.notes.forEach(function(n){
+      if(n.x==null || n.y==null) return;
+      var nx = clamp(n.x, 0, window.innerWidth-STICKY_W);
+      var ny = clamp(n.y, 0, window.innerHeight-STICKY_H);
+      if(nx!==n.x || ny!==n.y){ n.x=nx; n.y=ny; changed=true; }
+    });
+    if(changed){ renderStickyLayer(); debounceSaveNotes(); }
+  }
+  if(document.getElementById('editorNotesOverlayRoot') && state.draft){
+    var editorChanged = false;
+    (state.draft.editorNotes||[]).forEach(function(n){
+      if(n.x==null || n.y==null) return;
+      var ex = clamp(n.x, 0, window.innerWidth-EDITOR_NOTE_W);
+      var ey = clamp(n.y, 0, window.innerHeight-EDITOR_NOTE_H);
+      if(ex!==n.x || ey!==n.y){ n.x=ex; n.y=ey; editorChanged=true; }
+    });
+    if(editorChanged){ renderEditorNoteLayer(); debounceSave(); }
+  }
 });
 render();
 // Identity comes from the URL, so the drafts list can populate before the student
