@@ -93,9 +93,14 @@ change. Env vars only take effect on a new deployment.
 - Links do not expire. The only way to revoke access is to rotate
   `STUDENT_LINK_SECRET`, which invalidates every student's link at once.
 - Opening an example session from the home screen is a read-only preview — nothing it
-  contains is ever saved, so a student can explore freely without creating a draft. The
-  two seeded copies that sit in the coach inbox (`EXAMPLE-HMG`, `EXAMPLE-AOG`) still use
-  the username `Example`, so anyone who types that can still rename or delete those two.
+  contains is ever saved, so a student can explore freely without creating a draft. Two
+  seeded copies of those same sessions (`EXAMPLE-HMG`, `EXAMPLE-AOG`) sit in the coach
+  inbox at "Ready for review" and still use the username `Example`, so anyone who types
+  that can rename or delete those two from their own resume list. Four more seeded
+  drafts (`EXAMPLE-AOG-REV`, `-PEND`, `-READY`, `-SHIP`) walk that same session through
+  the rest of the coach pipeline as a worked example — each uses a distinct
+  `Example (...)` username, so they aren't reachable the same way, and Accept/Delete are
+  hidden for all six from the coach side (`isSeededExampleId` in `authoring-tool.html`).
 - The coach inbox password (`COACH_PASSWORD`) has no lockout on repeated wrong guesses,
   and a successful coach sign-in issues a token with no identity attached, valid for 8
   hours with no way to revoke it early.
