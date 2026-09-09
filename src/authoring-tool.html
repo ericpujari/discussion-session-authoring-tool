@@ -101,6 +101,17 @@
      side (STICKY_W = 170px in JS, kept in sync here) so the card grows with the window. */
   .inbox-draft-wrap{max-width:none; margin:0; padding:44px 190px 80px;}
   @media (max-width:900px){ .inbox-draft-wrap{padding-left:24px; padding-right:24px;} }
+  /* Pinned to the viewport (not the page) so the back button and save indicator stay
+     reachable while scrolling through a long draft/pending record, parked in the left
+     gutter (.inbox-draft-wrap's 190px side padding, above) so it never covers content.
+     Below that breakpoint the gutter is gone, so it drops back into normal flow. */
+  .coach-pin{
+    position:fixed; left:24px; top:28px; z-index:30;
+    display:flex; flex-direction:column; align-items:flex-start; gap:10px; max-width:150px;
+  }
+  @media (max-width:900px){
+    .coach-pin{position:static; max-width:none; flex-direction:row; align-items:center; margin-bottom:16px;}
+  }
   .home-hero{text-align:center; color:#F2EEE1; margin-bottom:44px;}
   .home-hero h1{
     font-size:clamp(30px,5vw,46px); margin:14px 0 12px; line-height:1.14;
@@ -561,8 +572,13 @@
      it's about, red/coral so it reads as "an adult marked this up" rather than the
      student's own yellow/pink/blue/green/purple stickies. Draggable, but no delete and
      no recolor — only a coach clears it, from the review page. */
+  /* position:absolute (not fixed) so these scroll with the page and stay lined up with
+     the field they're pointing at, rather than hovering at a fixed spot on screen while
+     the content underneath scrolls away — see placeEditorNoteIfNeeded for the coordinate
+     math (page-relative, i.e. including scroll offset, unlike the viewport-relative
+     sticky notes below). */
   .editor-note{
-    position:fixed; width:200px; background:#FCEBE7; border:1.5px solid #E3A99D;
+    position:absolute; width:200px; background:#FCEBE7; border:1.5px solid #E3A99D;
     border-radius:10px; box-shadow:var(--shadow-sm); padding:10px 26px 10px 14px;
   }
   .editor-note::before{
@@ -621,6 +637,10 @@
   .inbox-row:hover{transform:translateY(-1px);}
   .inbox-row .ir-left h4{font-size:15px; margin-bottom:3px;}
   .inbox-row .ir-left p{font-size:12.5px; color:var(--ink-soft); font-family:var(--font-mono);}
+  .inbox-row .ir-left .ir-polish-note{
+    font-family:var(--font-body); font-size:12.5px; font-style:italic;
+    color:var(--ink); margin-top:4px; opacity:.8;
+  }
   .inbox-row.flagged-row{border-left:5px solid #C0392B; background:#FBEAE8;}
   .empty-state{color:#C7D2DD; text-align:center; padding:50px 20px; font-size:14.5px;}
   .banner{
@@ -1026,6 +1046,10 @@ function esc(s){
 }
 function uid(){ return Math.random().toString(36).slice(2,9); }
 function clamp(v,min,max){ return Math.max(min, Math.min(max, v)); }
+// Full page dimensions (not just the viewport) — used to keep page-relative, absolutely
+// positioned elements (like editor's notes) within the actual document bounds.
+function docWidth(){ return Math.max(document.documentElement.scrollWidth, window.innerWidth); }
+function docHeight(){ return Math.max(document.documentElement.scrollHeight, window.innerHeight); }
 var STICKY_W = 170, STICKY_H = 170, HANDLE_H = 30; // keep in sync with .sticky-drag-handle's height
 // Mirrors the .sticky-note @media rule above. Every drag/clamp calculation reads these,
 // so if the CSS size changes and these don't, notes clamp to the wrong bounds.
@@ -1724,6 +1748,11 @@ function newPendingFromDraft(d){
     submittedAt: d.submittedAt, // carried over so the inbox's "date submitted" filter still means the original submission once this has moved past 'pending'
     bigIdea: d.bigIdea, // carried over for the coach's own reference only — never shown to students, never exported
     parentBlurb: '',
+    // Coach-only working note — "what's left to do" — surfaced both here and as a
+    // preview on the inbox row (renderPendingRow) so it's visible without opening the
+    // record. Not locked when 'ready'/'shipped' (unlike the session content fields):
+    // it's status/to-do metadata, not part of what gets shipped.
+    polishNote: '',
     optionCount: d.optionCount,
     scenarios: d.scenarios.map(function(sc){
       return {
@@ -1753,6 +1782,7 @@ function patchPendingRecord(p){
   if(typeof p.bigIdea !== 'string') p.bigIdea = '';
   if(typeof p.submittedAt !== 'number') p.submittedAt = null;
   if(typeof p.parentBlurb !== 'string') p.parentBlurb = '';
+  if(typeof p.polishNote !== 'string') p.polishNote = '';
   if(typeof p.optionCount !== 'number' || p.optionCount < 2 || p.optionCount > LANES.length) p.optionCount = 3;
   if(!Array.isArray(p.scenarios)) p.scenarios = [];
   p.scenarios = p.scenarios.slice(0, SCENARIO_COUNT).map(function(sc){ return patchScenario(sc, p.optionCount); });
@@ -3023,9 +3053,11 @@ function renderPendingRow(p){
     : p.status==='ready'
     ? ('Ready for code '+timeAgo(p.readyAt))
     : 'Accepted '+timeAgo(p.createdAt)+' — ready to polish';
+  var noteText = (p.polishNote||'').trim();
+  var notePreview = noteText ? ('<p class="ir-polish-note">📝 '+esc(noteText.length > 140 ? noteText.slice(0,140)+'…' : noteText)+'</p>') : '';
   return ''+
   '<div class="inbox-row" data-action="openPendingDraft" data-id="'+esc(p.id)+'">'+
-    '<div class="ir-left"><h4>'+esc(p.title||'Untitled')+' — <span style="font-weight:400;">'+esc(p.studentName)+'</span></h4><p>CODE '+esc(p.id)+' · '+esc(statusLine)+'</p></div>'+
+    '<div class="ir-left"><h4>'+esc(p.title||'Untitled')+' — <span style="font-weight:400;">'+esc(p.studentName)+'</span></h4><p>CODE '+esc(p.id)+' · '+esc(statusLine)+'</p>'+notePreview+'</div>'+
     '<div style="display:flex; align-items:center; gap:10px;">'+
       '<button class="btn btn-ghost btn-small" data-action="exportMarkdownPending" data-id="'+esc(p.id)+'" title="Download as Markdown">⬇ Markdown</button>'+
       '<span class="status-badge '+badgeCls+'">'+badgeLabel+'</span>'+
@@ -3186,8 +3218,8 @@ function renderShellInboxDraft(){
   if(!d) return renderShellInbox();
   var sm = statusMeta(d.status, 'coach'), statusCls = sm.cls, statusLabel = sm.full;
   return ''+
+  '<div class="coach-pin"><button class="btn btn-ghost-light btn-small" data-action="goInbox">← All drafts</button></div>'+
   '<div class="home-wrap inbox-draft-wrap">'+
-    '<button class="btn btn-ghost-light btn-small" data-action="goInbox" style="margin-bottom:16px;">← All drafts</button>'+
     '<div style="margin-bottom:10px; display:flex; gap:10px; align-items:center; flex-wrap:wrap;">'+
       '<span class="status-badge '+statusCls+'">'+statusLabel+'</span>'+
     '</div>'+
@@ -3296,11 +3328,15 @@ function renderPendingScreen(){
   var blurbMissingMantra = !locked && p.parentBlurb.trim() && p.parentBlurb.indexOf(MANTRA)===-1;
 
   return ''+
+  '<div class="coach-pin">'+
+    '<button class="btn btn-ghost-light btn-small" data-action="closePendingDraft">← All drafts</button>'+
+    // Shown even when locked: polishNote (below) stays editable past 'ready'/'shipped',
+    // so the indicator needs to keep working for it.
+    '<span id="pendingSaveIndicator" class="rail-save-indicator '+pendingSaveStatus+'">'+saveStatusText(pendingSaveStatus)+'</span>'+
+  '</div>'+
   '<div class="home-wrap inbox-draft-wrap">'+
-    '<button class="btn btn-ghost-light btn-small" data-action="closePendingDraft" style="margin-bottom:16px;">← All drafts</button>'+
     '<div style="margin-bottom:10px; display:flex; gap:12px; align-items:center; flex-wrap:wrap;">'+
       '<span class="status-badge '+statusBadgeCls+'">'+statusBadgeLabel+'</span>'+
-      (locked? '' : '<span id="pendingSaveIndicator" class="rail-save-indicator '+pendingSaveStatus+'">'+saveStatusText(pendingSaveStatus)+'</span>')+
       '<button class="btn btn-ghost btn-small" data-action="exportMarkdownPending" data-id="'+esc(p.id)+'">⬇ Download as Markdown</button>'+
     '</div>'+
     '<div class="page-head"><h2>'+esc(p.title||'Untitled')+' <span style="font-weight:400; font-size:16px; color:var(--ink-soft);">— '+esc(p.studentName)+'</span></h2></div>'+
@@ -3328,6 +3364,10 @@ function renderPendingScreen(){
         '<div class="usage-week-add"><input type="date" id="usageWeekInput"><button type="button" class="btn btn-ghost btn-small" data-action="addUsageWeek" data-id="'+esc(p.id)+'">+ Add a week used</button></div>'+
       '</div>'
     ) : '')+
+    '<div class="panel">'+
+      '<h3>Note to self <span class="hint-inline">(coach-only — also shows on this session\'s row in the inbox)</span></h3>'+
+      '<div class="field"><textarea data-pbind="polishNote" maxlength="500" placeholder="What still needs to happen here?">'+esc(p.polishNote)+'</textarea></div>'+
+    '</div>'+
     '<div class="panel"><div class="review-actions">'+shipControls+'</div></div>'+
   '</div>';
 }
@@ -3626,14 +3666,16 @@ function placeEditorNoteIfNeeded(n, d){
   if(n.x!=null && n.y!=null) return;
   var el = editorNoteAnchorEl(n, d);
   var x, y;
+  // getBoundingClientRect() is viewport-relative — add the current scroll offset so the
+  // note's stored x/y is page-relative, matching its now-absolute (not fixed) position.
   if(el){
     var r = el.getBoundingClientRect();
-    x = r.right + 16; y = r.top;
+    x = r.right + window.scrollX + 16; y = r.top + window.scrollY;
   } else {
-    x = window.innerWidth - EDITOR_NOTE_W - 24; y = 120;
+    x = window.scrollX + window.innerWidth - EDITOR_NOTE_W - 24; y = window.scrollY + 120;
   }
-  n.x = clamp(x, 0, window.innerWidth-EDITOR_NOTE_W);
-  n.y = clamp(y, 0, window.innerHeight-EDITOR_NOTE_H);
+  n.x = clamp(x, 0, docWidth()-EDITOR_NOTE_W);
+  n.y = clamp(y, 0, docHeight()-EDITOR_NOTE_H);
   n.z = ++editorNoteZCounter;
   debounceSave();
 }
@@ -3675,8 +3717,8 @@ function startEditorNoteDrag(e, note){
   var el = document.querySelector('.editor-note[data-editornoteid="'+note.id+'"]');
   if(el) el.style.zIndex = note.z;
   function onMove(ev){
-    note.x = clamp(origX + (ev.clientX-startX), 0, window.innerWidth-EDITOR_NOTE_W);
-    note.y = clamp(origY + (ev.clientY-startY), 0, window.innerHeight-EDITOR_NOTE_H);
+    note.x = clamp(origX + (ev.clientX-startX), 0, docWidth()-EDITOR_NOTE_W);
+    note.y = clamp(origY + (ev.clientY-startY), 0, docHeight()-EDITOR_NOTE_H);
     if(el){ el.style.left = note.x+'px'; el.style.top = note.y+'px'; }
   }
   function onUp(ev){
@@ -3991,7 +4033,11 @@ function updateDraftField(bind, el, oidx, qidx){
 // scrolling page here.
 function updatePendingField(bind, el, sidx, oidx, qidx){
   var p = state.pendingDraft;
-  if(!p || p.status==='ready' || p.status==='shipped') return;
+  if(!p) return;
+  // polishNote is coach-only status metadata, not session content — it stays editable
+  // even once the record is locked at 'ready'/'shipped' (see the field guard below).
+  if(bind==='polishNote'){ p.polishNote = el.value; return; }
+  if(p.status==='ready' || p.status==='shipped') return;
   var v = el.value;
   if(bind==='title') p.title=v;
   else if(bind==='parentBlurb') p.parentBlurb=v;
@@ -5043,8 +5089,10 @@ window.addEventListener('resize', function(){
     var editorChanged = false;
     (state.draft.editorNotes||[]).forEach(function(n){
       if(n.x==null || n.y==null) return;
-      var ex = clamp(n.x, 0, window.innerWidth-EDITOR_NOTE_W);
-      var ey = clamp(n.y, 0, window.innerHeight-EDITOR_NOTE_H);
+      // Editor's notes are page-relative (see placeEditorNoteIfNeeded), so they're
+      // clamped against the document's full size, not just the current viewport.
+      var ex = clamp(n.x, 0, docWidth()-EDITOR_NOTE_W);
+      var ey = clamp(n.y, 0, docHeight()-EDITOR_NOTE_H);
       if(ex!==n.x || ey!==n.y){ n.x=ex; n.y=ey; editorChanged=true; }
     });
     if(editorChanged){ renderEditorNoteLayer(); debounceSave(); }
