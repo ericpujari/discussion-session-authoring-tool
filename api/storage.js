@@ -252,6 +252,15 @@ async function authorizeStudentKey(redis, op, key, value, owner) {
     return null;
   }
 
+  // Read-only here: written directly by api/noun-project-search.js at search
+  // time (it already holds a Redis connection for its own cache/budget keys),
+  // never through this generic storage endpoint.
+  if (key.startsWith('iconsearch:')) {
+    if (op !== 'get') return { status: 403, error: 'Icon search history can only be recorded by a search.' };
+    if (normalizeUsername(key.slice('iconsearch:'.length)) !== owner) return DENY;
+    return null;
+  }
+
   // Built for the current student beta test only (see FEEDBACK_ENABLED in the client).
   // One-way: a student can write their own feedback but never read any back — there's
   // nothing here for them to resume or edit, unlike a draft. Only a coach (who bypasses
