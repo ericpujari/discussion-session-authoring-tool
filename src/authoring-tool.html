@@ -449,6 +449,14 @@
   .coach-notes{background:#fff; border-radius:10px; padding:16px 18px; border:1.5px solid var(--line);}
   .coach-note{padding:10px 0; border-bottom:1px dashed var(--line); font-size:13.8px; line-height:1.5;}
   .coach-note:last-child{border-bottom:none;}
+  .coach-note-blocked{color:#8A241A;}
+  .icon-search-panel-head{display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none;}
+  .icon-search-panel-arrow{display:inline-flex; align-items:center; color:var(--ink-soft); transition:transform .15s ease;}
+  .icon-search-panel-arrow.collapsed{transform:rotate(-90deg);}
+  .icon-search-warning-badge{
+    background:#F5D4CF; color:#8A241A; border-radius:999px; padding:2px 10px;
+    font-size:12px; font-weight:600; margin-left:2px;
+  }
   .coach-note .cn-meta{font-family:var(--font-mono); font-size:10.5px; color:#8B94A0; margin-bottom:3px;}
 
   /* ---------- Coach drawer ---------- */
@@ -673,6 +681,14 @@
   .icon-search-result:hover{border-color:var(--ink-soft);}
   .icon-search-result.selected{border-color:var(--ink); background:#EDECE7;}
   .icon-search-result img{width:100%; height:100%; object-fit:contain;}
+  .icon-search-recent{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-bottom:8px;}
+  .icon-search-recent-label{color:var(--ink-soft); font-size:11.5px; font-weight:600;}
+  .icon-search-recent-pill{
+    background:#fff; border:1.5px solid var(--line); border-radius:999px; padding:3px 10px;
+    font-size:12px; color:var(--ink-soft); cursor:pointer;
+  }
+  .icon-search-recent-pill:hover{border-color:var(--ink-soft); color:var(--ink);}
+  .icon-search-recent-pill.blocked{border-color:#E0B4AE; color:#9B3B34;}
 
   /* ============ Player Preview (mimics the real Discussion Session screen) ============ */
   .pp-screen{
@@ -1007,6 +1023,9 @@ var state = {
   iconSearchResults: [],
   iconSearchLoading: false,
   iconSearchError: '',
+  iconSearchBlocked: false,  // true when the server rejected the last search as an inappropriate term
+  iconSearchHistoryByUser: {}, // {<normalizedUsername>: {entries:[...], loading, loaded}} — one shared cache, read by every search box for that student
+  iconSearchPanelOpen: {},    // {<draftId>: true|false} manual override for the coach's "Icon search activity" panel; absent = auto (open only if a blocked search exists)
   iconEmbedPending: null,   // {mode, scenarioIndex, optionIndex} while a clicked result is being embedded
   iconEmbedError: '',
   submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
@@ -3213,6 +3232,67 @@ function renderShellInboxFlagged(){
     '</div>'+
   '</div>';
 }
+// Makes the "your parents and coaches can see what you search" warning true —
+// a real, minimal view of a student's icon search log, not just a Redis
+// record nobody ever reads. Shares its data cache with the student-facing
+// recent-searches dropdown (loadIconSearchHistory), so if that already warmed
+// the cache this session, this panel shows instantly.
+//
+// Collapsed by default so a clean draft doesn't clutter the review screen —
+// but auto-opens itself whenever there's a blocked search to see, so a coach
+// never has to think to click it to catch the thing it exists to catch. A
+// manual toggle (state.iconSearchPanelOpen[draftId]) overrides that default
+// for the rest of this session; not persisted to localStorage like the inbox
+// group collapse state, since re-opening the same draft later should show
+// the safety signal again rather than remember "I hid this once."
+function iconSearchHistoryPanelHtml(username, draftId){
+  var u = normalizeUsername(username);
+  var cache = state.iconSearchHistoryByUser[u];
+  var entries = (cache && cache.entries) || [];
+  var blockedCount = entries.filter(function(e){ return e.blocked; }).length;
+  var override = state.iconSearchPanelOpen[draftId];
+  var open = (override !== undefined) ? override : blockedCount > 0;
+  var warningBadge = blockedCount
+    ? '<span class="icon-search-warning-badge">⚠️ '+blockedCount+' blocked</span>' : '';
+  var head = '<h3 class="icon-search-panel-head" data-action="toggleIconSearchPanel" data-draftid="'+esc(draftId)+'">'+
+      '<span class="icon-search-panel-arrow'+(open?'':' collapsed')+'">'+INBOX_CHEVRON_SVG+'</span>'+
+      'Icon search activity'+warningBadge+
+    '</h3>';
+  if(!open) return '<div class="panel">'+head+'</div>';
+
+  var body;
+  if(cache && cache.loading){
+    body = '<p class="hint">Loading…</p>';
+  } else if(!entries.length){
+    body = '<p class="hint">No icon searches yet.</p>';
+  } else {
+    // Every blocked search is shown, no matter how old — the whole point is
+    // that one from weeks ago shouldn't get buried by ordinary searching
+    // since. Only the routine, allowed searches are capped to the most
+    // recent handful, so the panel doesn't turn into an endless "trophy,
+    // star, heart..." list.
+    var blockedRows = entries.filter(function(e){ return e.blocked; });
+    var allowedRows = entries.filter(function(e){ return !e.blocked; });
+    var recentAllowed = allowedRows.slice(-20).reverse();
+    var olderAllowedCount = allowedRows.length - recentAllowed.length;
+    function rowHtml(e){
+      return '<div class="coach-note'+(e.blocked?' coach-note-blocked':'')+'"><div class="cn-meta">'+timeAgo(e.at)+(e.blocked?' · ⚠️ blocked':'')+'</div>'+esc(e.term)+'</div>';
+    }
+    var html = '';
+    if(blockedRows.length){
+      html += '<div class="coach-notes">'+blockedRows.slice().reverse().map(rowHtml).join('')+'</div>';
+    }
+    if(recentAllowed.length){
+      html += '<p class="hint" style="margin-top:'+(blockedRows.length?'10px':'0')+';">'+(blockedRows.length?'Other, allowed searches:':'Allowed searches:')+'</p>';
+      html += '<div class="coach-notes">'+recentAllowed.map(rowHtml).join('')+'</div>';
+    }
+    if(olderAllowedCount > 0){
+      html += '<p class="hint">+'+olderAllowedCount+' more allowed '+(olderAllowedCount===1?'search':'searches')+' not shown.</p>';
+    }
+    body = html;
+  }
+  return '<div class="panel">'+head+body+'</div>';
+}
 function renderShellInboxDraft(){
   var d = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
   if(!d) return renderShellInbox();
@@ -3226,6 +3306,7 @@ function renderShellInboxDraft(){
     renderReviewPreview(d, {coachNotes:true})+
     (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
+    iconSearchHistoryPanelHtml(d.studentName, d.id)+
     '<div class="panel">'+
       '<h3>Leave feedback for '+esc(d.studentName)+' <span id="coachFeedbackSaveIndicator" class="rail-save-indicator saved" style="text-transform:none; letter-spacing:0; font-family:inherit;"></span></h3>'+
       '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass? (Accepting sends this along as a congratulatory note.)">'+esc(d.coachDraftNote||'')+'</textarea></div>'+
@@ -3738,19 +3819,35 @@ function removeEditorNotesOverlay(){
 }
 
 /* ============================= ICON SEARCH (Noun Project, via serverless proxy) ============================= */
-function performIconSearch(query){
+function performIconSearch(query, username, mode, scenarioIndex, optionIndex){
   state.iconSearchLoading = true;
   state.iconSearchError = '';
+  state.iconSearchBlocked = false;
   state.iconSearchResults = [];
   render();
-  fetch(ICON_SEARCH_ENDPOINT+'?q='+encodeURIComponent(query))
+  var url = ICON_SEARCH_ENDPOINT+'?q='+encodeURIComponent(query)
+    +'&username='+encodeURIComponent(username||'')
+    +'&mode='+encodeURIComponent(mode||'draft')
+    +'&scenarioIndex='+encodeURIComponent(scenarioIndex)
+    +'&optionIndex='+encodeURIComponent(optionIndex);
+  fetch(url)
     .then(function(res){
       if(!res.ok) throw new Error('search-failed');
       return res.json();
     })
     .then(function(data){
       state.iconSearchLoading = false;
-      state.iconSearchResults = (data && Array.isArray(data.results)) ? data.results : [];
+      if(data && data.blocked){
+        state.iconSearchBlocked = true;
+        state.iconSearchResults = [];
+      } else {
+        state.iconSearchResults = (data && Array.isArray(data.results)) ? data.results : [];
+      }
+      // The server already logged this attempt — mirror it into the shared
+      // client-side cache immediately rather than waiting on a re-fetch, so a
+      // search just made in one box shows up as "Recent" in another box right
+      // away instead of only after the next full page load.
+      recordIconSearchLocally(username, query, !!(data && data.blocked));
       render();
     })
     .catch(function(){
@@ -3801,6 +3898,76 @@ function embedSelectedIcon(icon, scenarioIndex, optionIndex, mode){
       render();
     });
 }
+// Shared per-student search-history cache, keyed by username so it's identical
+// across every search box in a draft (there's one per scenario option) — a
+// term searched in scenario 1's box shows up in scenario 3's box too. Fetched
+// at most once per username per page load; the searchIcon handler calls this
+// on every search, but the cache guards the actual network request.
+function loadIconSearchHistory(username){
+  var u = normalizeUsername(username);
+  if(!u || !hasStorage) return Promise.resolve([]);
+  var cache = state.iconSearchHistoryByUser[u];
+  if(cache && (cache.loading || cache.loaded)) return Promise.resolve(cache.entries || []);
+  state.iconSearchHistoryByUser[u] = {entries:[], loading:true, loaded:false};
+  return window.storage.get('iconsearch:'+u, true)
+    .then(function(r){
+      var entries = [];
+      if(r && r.value){
+        try{
+          var parsed = JSON.parse(r.value);
+          if(parsed && Array.isArray(parsed.entries)) entries = parsed.entries;
+        }catch(e){}
+      }
+      // Merge, don't overwrite: recordIconSearchLocally may have appended a
+      // just-completed search to this same cache while this fetch was still
+      // in flight (the server's own write for that search is fire-and-forget
+      // for allowed terms, so it can genuinely lose this race) — dropping
+      // those local entries here would make a search vanish from "Recent"
+      // moments after it was made. A harmless duplicate is possible if the
+      // server write did land in time; recentIconSearchTerms already dedupes
+      // by term for the dropdown.
+      var already = state.iconSearchHistoryByUser[u];
+      var localOnly = (already && already.entries) || [];
+      state.iconSearchHistoryByUser[u] = {entries:entries.concat(localOnly), loading:false, loaded:true};
+      render();
+      return state.iconSearchHistoryByUser[u].entries;
+    })
+    .catch(function(){
+      state.iconSearchHistoryByUser[u] = {entries:[], loading:false, loaded:true};
+      render();
+      return [];
+    });
+}
+// Appends a just-completed search directly into the shared cache. Needed
+// because loadIconSearchHistory only ever fetches once per username per page
+// load (see its own comment) — without this, a search made in one box
+// wouldn't show as "Recent" in another box opened moments later, only after a
+// full reload re-fetched from the server.
+function recordIconSearchLocally(username, term, blocked){
+  var u = normalizeUsername(username);
+  if(!u || !term) return;
+  var cache = state.iconSearchHistoryByUser[u];
+  if(!cache){
+    cache = {entries:[], loading:false, loaded:true};
+    state.iconSearchHistoryByUser[u] = cache;
+  }
+  cache.entries.push({term:term, blocked:blocked, at:Date.now()});
+}
+// Most-recent-first, deduped by term, capped at 8 — the visible "Recent" pills.
+function recentIconSearchTerms(username){
+  var u = normalizeUsername(username);
+  var cache = state.iconSearchHistoryByUser[u];
+  var entries = (cache && cache.entries) || [];
+  var seen = {}, out = [];
+  for(var i=entries.length-1; i>=0 && out.length<8; i--){
+    var term = (entries[i].term||'').trim();
+    var key = term.toLowerCase();
+    if(!term || seen[key]) continue;
+    seen[key] = true;
+    out.push({term:term, blocked:!!entries[i].blocked});
+  }
+  return out;
+}
 function iconSearchStripHtml(o, scenarioIdx, optionIdx, mode){
   var loc = state.iconSearchOpen;
   if(!loc || loc.mode!==(mode||'draft') || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
@@ -3816,12 +3983,27 @@ function iconSearchStripHtml(o, scenarioIdx, optionIdx, mode){
       ? '<div class="icon-search-status icon-search-error">'+esc(state.iconEmbedError)+'</div>'
       : (state.iconSearchLoading
         ? '<div class="icon-search-status">Searching…</div>'
-        : state.iconSearchError
-          ? '<div class="icon-search-status icon-search-error">'+esc(state.iconSearchError)+'</div>'
-          : (state.iconSearchResults.length
-              ? '<div class="icon-search-results">'+resultsHtml+'</div>'
-              : '<div class="icon-search-status">No icons found. Try a simpler word.</div>'));
-  return '<div class="icon-search-strip"><button type="button" class="icon-search-dismiss" data-action="dismissIconSearch" title="Close">✕</button>'+body+'</div>';
+        : state.iconSearchBlocked
+          ? '<div class="icon-search-status icon-search-error">That search isn\'t allowed here. Your parents and coaches can see what you search.</div>'
+          : (state.iconSearchError
+            ? '<div class="icon-search-status icon-search-error">'+esc(state.iconSearchError)+'</div>'
+            : (state.iconSearchResults.length
+                ? '<div class="icon-search-results">'+resultsHtml+'</div>'
+                : '<div class="icon-search-status">No icons found. Try a simpler word.</div>')));
+  var histSource = (mode||'draft')==='pending' ? state.pendingDraft : state.draft;
+  var recent = histSource ? recentIconSearchTerms(histSource.studentName) : [];
+  var recentHtml = recent.length ? (
+    '<div class="icon-search-recent">'+
+      '<span class="icon-search-recent-label">Recent:</span>'+
+      recent.map(function(r){
+        return '<button type="button" class="icon-search-recent-pill'+(r.blocked?' blocked':'')+'" '+
+          'data-action="searchIconFromHistory" data-term="'+esc(r.term)+'" '+
+          'data-scenarioidx="'+scenarioIdx+'" data-oidx="'+optionIdx+'" data-mode="'+(mode||'draft')+'">'+
+          esc(r.term)+(r.blocked?' 🚫':'')+'</button>';
+      }).join('')+
+    '</div>'
+  ) : '';
+  return '<div class="icon-search-strip"><button type="button" class="icon-search-dismiss" data-action="dismissIconSearch" title="Close">✕</button>'+recentHtml+body+'</div>';
 }
 
 /* ============================= AI COACH CALL ============================= */
@@ -4417,6 +4599,23 @@ function handleClick(e){
     render();
     return;
   }
+  if(action==='toggleIconSearchPanel'){
+    var panelDraftId = t.getAttribute('data-draftid');
+    if(!panelDraftId) return;
+    var currentlyOpen = state.iconSearchPanelOpen[panelDraftId];
+    if(currentlyOpen === undefined){
+      // First click ever on this draft: figure out what "open" currently
+      // means (the auto default) so toggling flips it, rather than assuming
+      // it was closed.
+      var u = normalizeUsername(state.inboxList.filter(function(x){return x.id===panelDraftId;})[0]?.studentName);
+      var cache = state.iconSearchHistoryByUser[u];
+      var hadBlocked = ((cache && cache.entries) || []).some(function(e){ return e.blocked; });
+      currentlyOpen = hadBlocked;
+    }
+    state.iconSearchPanelOpen[panelDraftId] = !currentlyOpen;
+    render();
+    return;
+  }
   if(action==='toggleInboxStage'){
     var stageKey = t.getAttribute('data-stage');
     if(!stageKey) return;
@@ -4483,6 +4682,8 @@ function handleClick(e){
   if(action==='openInboxDraft'){
     state.inboxSelectedId = t.getAttribute('data-id');
     state.screen='inboxDraft';
+    var openedDraft = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
+    if(openedDraft) loadIconSearchHistory(openedDraft.studentName);
     render();
     return;
   }
@@ -4842,7 +5043,22 @@ function handleClick(e){
     if(!query) return;
     state.iconSearchOpen = {mode:searchMode, scenarioIndex:scenarioIdx, optionIndex:optionIdx};
     state.iconEmbedError = '';
-    performIconSearch(query);
+    performIconSearch(query, searchSource.studentName, searchMode, scenarioIdx, optionIdx);
+    loadIconSearchHistory(searchSource.studentName);
+    return;
+  }
+  if(action==='searchIconFromHistory'){
+    var histScenarioIdx = parseInt(t.getAttribute('data-scenarioidx'),10);
+    var histOptionIdx = parseInt(t.getAttribute('data-oidx'),10);
+    var histMode = t.getAttribute('data-mode') || 'draft';
+    var histTerm = t.getAttribute('data-term') || '';
+    var histSource = histMode==='pending' ? state.pendingDraft : state.draft;
+    if(!histSource || !histTerm) return;
+    histSource.scenarios[histScenarioIdx].options[histOptionIdx].iconDescription = histTerm;
+    state.iconSearchOpen = {mode:histMode, scenarioIndex:histScenarioIdx, optionIndex:histOptionIdx};
+    state.iconEmbedError = '';
+    performIconSearch(histTerm, histSource.studentName, histMode, histScenarioIdx, histOptionIdx);
+    if(histMode==='pending') debouncePendingSave(); else debounceSave();
     return;
   }
   if(action==='dismissIconSearch'){ state.iconSearchOpen = null; state.iconEmbedError=''; render(); return; }
