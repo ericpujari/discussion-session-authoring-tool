@@ -458,6 +458,13 @@
     font-size:12px; font-weight:600; margin-left:2px;
   }
   .coach-note .cn-meta{font-family:var(--font-mono); font-size:10.5px; color:#8B94A0; margin-bottom:3px;}
+  .icon-search-row-term{display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .icon-search-block-btn{
+    flex-shrink:0; background:#fff; border:1.5px solid var(--line); border-radius:7px;
+    padding:3px 9px; font-size:11.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .icon-search-block-btn:hover{border-color:#C0463A; color:#C0463A;}
+  .icon-search-block-btn:disabled{opacity:.6; cursor:default;}
 
   /* ---------- Coach drawer ---------- */
   .coach-tab{
@@ -879,6 +886,7 @@
       delete: function(key){ return call({op:'delete', key:key}); },
       list: function(prefix){ return call({op:'list', key:prefix}); },
       listByUser: function(prefix, username){ return call({op:'listByUser', key:prefix, username:username}); },
+      blockIconTerm: function(term){ return call({op:'blockIconTerm', key:'iconblocklist:custom', term:term}); },
       coachLogin: function(password){
         return call({op:'coachLogin', password:password}).then(function(r){
           setToken(r && r.token);
@@ -1026,6 +1034,8 @@ var state = {
   iconSearchBlocked: false,  // true when the server rejected the last search as an inappropriate term
   iconSearchHistoryByUser: {}, // {<normalizedUsername>: {entries:[...], loading, loaded}} — one shared cache, read by every search box for that student
   iconSearchPanelOpen: {},    // {<draftId>: true|false} manual override for the coach's "Icon search activity" panel; absent = auto (open only if a blocked search exists)
+  iconBlocklistCustom: {terms:[], loading:false, loaded:false}, // shared (not per-student) cache of coach-added blocklist words, from lib/icon-blocklist-store.js
+  iconBlockPending: null,     // the term currently being sent to blockIconTerm, so its button can show a pending state
   iconEmbedPending: null,   // {mode, scenarioIndex, optionIndex} while a clicked result is being embedded
   iconEmbedError: '',
   submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
@@ -3249,7 +3259,11 @@ function iconSearchHistoryPanelHtml(username, draftId){
   var u = normalizeUsername(username);
   var cache = state.iconSearchHistoryByUser[u];
   var entries = (cache && cache.entries) || [];
-  var blockedCount = entries.filter(function(e){ return e.blocked; }).length;
+  // "Effectively" blocked: either it was blocked at the time it was searched,
+  // or a coach has since added it to the runtime blocklist via the button
+  // below — either way it belongs in the flagged section now.
+  function effectivelyBlocked(e){ return e.blocked || isCustomBlocked(e.term); }
+  var blockedCount = entries.filter(effectivelyBlocked).length;
   var override = state.iconSearchPanelOpen[draftId];
   var open = (override !== undefined) ? override : blockedCount > 0;
   var warningBadge = blockedCount
@@ -3271,12 +3285,21 @@ function iconSearchHistoryPanelHtml(username, draftId){
     // since. Only the routine, allowed searches are capped to the most
     // recent handful, so the panel doesn't turn into an endless "trophy,
     // star, heart..." list.
-    var blockedRows = entries.filter(function(e){ return e.blocked; });
-    var allowedRows = entries.filter(function(e){ return !e.blocked; });
+    var blockedRows = entries.filter(effectivelyBlocked);
+    var allowedRows = entries.filter(function(e){ return !effectivelyBlocked(e); });
     var recentAllowed = allowedRows.slice(-20).reverse();
     var olderAllowedCount = allowedRows.length - recentAllowed.length;
     function rowHtml(e){
-      return '<div class="coach-note'+(e.blocked?' coach-note-blocked':'')+'"><div class="cn-meta">'+timeAgo(e.at)+(e.blocked?' · ⚠️ blocked':'')+'</div>'+esc(e.term)+'</div>';
+      var blocked = effectivelyBlocked(e);
+      var isPending = state.iconBlockPending === stripLeadingArticleClient(e.term||'').trim().toLowerCase();
+      var blockBtn = blocked ? '' :
+        '<button type="button" class="icon-search-block-btn" data-action="blockSearchedWord" data-term="'+esc(e.term)+'"'+(isPending?' disabled':'')+'>'+
+          (isPending ? 'Blocking…' : '🚫 Block this word') +
+        '</button>';
+      return '<div class="coach-note'+(blocked?' coach-note-blocked':'')+'">'+
+          '<div class="cn-meta">'+timeAgo(e.at)+(blocked?' · ⚠️ blocked':'')+'</div>'+
+          '<div class="icon-search-row-term">'+esc(e.term)+blockBtn+'</div>'+
+        '</div>';
     }
     var html = '';
     if(blockedRows.length){
@@ -3968,6 +3991,68 @@ function recentIconSearchTerms(username){
   }
   return out;
 }
+// Same trim as stripLeadingArticle in api/noun-project-search.js, duplicated
+// client-side (matches this file's existing pattern of small helpers like
+// normalizeUsername living independently on both sides) — applied before
+// blocking a searched term so "a badword" blocks the reusable "badword",
+// not just that exact phrasing.
+function stripLeadingArticleClient(text){
+  var stripped = (text||'').replace(/^(a|an)\s+/i, '').trim();
+  return stripped || text;
+}
+// Fetched once per page load (shared across every draft a coach opens, since
+// the blocklist is global, not per-student) — mirrors loadIconSearchHistory's
+// cache-once approach.
+function loadCustomBlockedTerms(){
+  if(!hasStorage) return Promise.resolve([]);
+  var c = state.iconBlocklistCustom;
+  if(c.loading || c.loaded) return Promise.resolve(c.terms);
+  state.iconBlocklistCustom = {terms:[], loading:true, loaded:false};
+  return window.storage.get('iconblocklist:custom', true)
+    .then(function(r){
+      var terms = [];
+      if(r && r.value){
+        try{
+          var parsed = JSON.parse(r.value);
+          if(parsed && Array.isArray(parsed.terms)) terms = parsed.terms.map(function(t){ return t.term; }).filter(Boolean);
+        }catch(e){}
+      }
+      state.iconBlocklistCustom = {terms:terms, loading:false, loaded:true};
+      render();
+      return terms;
+    })
+    .catch(function(){
+      state.iconBlocklistCustom = {terms:[], loading:false, loaded:true};
+      render();
+      return [];
+    });
+}
+// Whether a searched term is already covered by the coach-added list —
+// exact (case-insensitive, article-stripped) match is good enough here since
+// this only drives the "already blocked" UI state; the actual enforcement
+// server-side runs the real normalizeForBlocklist + word-boundary match
+// against whatever a student types next, not this simpler check.
+function isCustomBlocked(term){
+  var cleaned = stripLeadingArticleClient(term||'').trim().toLowerCase();
+  if(!cleaned) return false;
+  return state.iconBlocklistCustom.terms.indexOf(cleaned) !== -1;
+}
+function blockSearchedWord(term){
+  var cleaned = stripLeadingArticleClient(term||'').trim();
+  if(!cleaned || !hasStorage) return;
+  state.iconBlockPending = cleaned.toLowerCase();
+  render();
+  window.storage.blockIconTerm(cleaned)
+    .then(function(r){
+      state.iconBlockPending = null;
+      if(r && Array.isArray(r.terms)) state.iconBlocklistCustom = {terms:r.terms, loading:false, loaded:true};
+      render();
+    })
+    .catch(function(){
+      state.iconBlockPending = null;
+      render();
+    });
+}
 function iconSearchStripHtml(o, scenarioIdx, optionIdx, mode){
   var loc = state.iconSearchOpen;
   if(!loc || loc.mode!==(mode||'draft') || loc.scenarioIndex!==scenarioIdx || loc.optionIndex!==optionIdx) return '';
@@ -4609,7 +4694,7 @@ function handleClick(e){
       // it was closed.
       var u = normalizeUsername(state.inboxList.filter(function(x){return x.id===panelDraftId;})[0]?.studentName);
       var cache = state.iconSearchHistoryByUser[u];
-      var hadBlocked = ((cache && cache.entries) || []).some(function(e){ return e.blocked; });
+      var hadBlocked = ((cache && cache.entries) || []).some(function(e){ return e.blocked || isCustomBlocked(e.term); });
       currentlyOpen = hadBlocked;
     }
     state.iconSearchPanelOpen[panelDraftId] = !currentlyOpen;
@@ -4684,7 +4769,13 @@ function handleClick(e){
     state.screen='inboxDraft';
     var openedDraft = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
     if(openedDraft) loadIconSearchHistory(openedDraft.studentName);
+    loadCustomBlockedTerms();
     render();
+    return;
+  }
+  if(action==='blockSearchedWord'){
+    var wordToBlock = t.getAttribute('data-term');
+    blockSearchedWord(wordToBlock);
     return;
   }
   if(action==='openInboxFlagged'){
