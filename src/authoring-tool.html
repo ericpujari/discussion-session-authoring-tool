@@ -449,6 +449,14 @@
   .coach-notes{background:#fff; border-radius:10px; padding:16px 18px; border:1.5px solid var(--line);}
   .coach-note{padding:10px 0; border-bottom:1px dashed var(--line); font-size:13.8px; line-height:1.5;}
   .coach-note:last-child{border-bottom:none;}
+  .coach-note-blocked{color:#8A241A;}
+  .icon-search-panel-head{display:flex; align-items:center; gap:7px; cursor:pointer; user-select:none;}
+  .icon-search-panel-arrow{display:inline-flex; align-items:center; color:var(--ink-soft); transition:transform .15s ease;}
+  .icon-search-panel-arrow.collapsed{transform:rotate(-90deg);}
+  .icon-search-warning-badge{
+    background:#F5D4CF; color:#8A241A; border-radius:999px; padding:2px 10px;
+    font-size:12px; font-weight:600; margin-left:2px;
+  }
   .coach-note .cn-meta{font-family:var(--font-mono); font-size:10.5px; color:#8B94A0; margin-bottom:3px;}
 
   /* ---------- Coach drawer ---------- */
@@ -1017,6 +1025,7 @@ var state = {
   iconSearchError: '',
   iconSearchBlocked: false,  // true when the server rejected the last search as an inappropriate term
   iconSearchHistoryByUser: {}, // {<normalizedUsername>: {entries:[...], loading, loaded}} — one shared cache, read by every search box for that student
+  iconSearchPanelOpen: {},    // {<draftId>: true|false} manual override for the coach's "Icon search activity" panel; absent = auto (open only if a blocked search exists)
   iconEmbedPending: null,   // {mode, scenarioIndex, optionIndex} while a clicked result is being embedded
   iconEmbedError: '',
   submitError: '',    // set when "Submit to my coach" is blocked by an incomplete section
@@ -3228,20 +3237,61 @@ function renderShellInboxFlagged(){
 // record nobody ever reads. Shares its data cache with the student-facing
 // recent-searches dropdown (loadIconSearchHistory), so if that already warmed
 // the cache this session, this panel shows instantly.
-function iconSearchHistoryPanelHtml(username){
+//
+// Collapsed by default so a clean draft doesn't clutter the review screen —
+// but auto-opens itself whenever there's a blocked search to see, so a coach
+// never has to think to click it to catch the thing it exists to catch. A
+// manual toggle (state.iconSearchPanelOpen[draftId]) overrides that default
+// for the rest of this session; not persisted to localStorage like the inbox
+// group collapse state, since re-opening the same draft later should show
+// the safety signal again rather than remember "I hid this once."
+function iconSearchHistoryPanelHtml(username, draftId){
   var u = normalizeUsername(username);
   var cache = state.iconSearchHistoryByUser[u];
   var entries = (cache && cache.entries) || [];
+  var blockedCount = entries.filter(function(e){ return e.blocked; }).length;
+  var override = state.iconSearchPanelOpen[draftId];
+  var open = (override !== undefined) ? override : blockedCount > 0;
+  var warningBadge = blockedCount
+    ? '<span class="icon-search-warning-badge">⚠️ '+blockedCount+' blocked</span>' : '';
+  var head = '<h3 class="icon-search-panel-head" data-action="toggleIconSearchPanel" data-draftid="'+esc(draftId)+'">'+
+      '<span class="icon-search-panel-arrow'+(open?'':' collapsed')+'">'+INBOX_CHEVRON_SVG+'</span>'+
+      'Icon search activity'+warningBadge+
+    '</h3>';
+  if(!open) return '<div class="panel">'+head+'</div>';
+
+  var body;
   if(cache && cache.loading){
-    return '<div class="panel"><h3>Icon search activity</h3><p class="hint">Loading…</p></div>';
+    body = '<p class="hint">Loading…</p>';
+  } else if(!entries.length){
+    body = '<p class="hint">No icon searches yet.</p>';
+  } else {
+    // Every blocked search is shown, no matter how old — the whole point is
+    // that one from weeks ago shouldn't get buried by ordinary searching
+    // since. Only the routine, allowed searches are capped to the most
+    // recent handful, so the panel doesn't turn into an endless "trophy,
+    // star, heart..." list.
+    var blockedRows = entries.filter(function(e){ return e.blocked; });
+    var allowedRows = entries.filter(function(e){ return !e.blocked; });
+    var recentAllowed = allowedRows.slice(-20).reverse();
+    var olderAllowedCount = allowedRows.length - recentAllowed.length;
+    function rowHtml(e){
+      return '<div class="coach-note'+(e.blocked?' coach-note-blocked':'')+'"><div class="cn-meta">'+timeAgo(e.at)+(e.blocked?' · ⚠️ blocked':'')+'</div>'+esc(e.term)+'</div>';
+    }
+    var html = '';
+    if(blockedRows.length){
+      html += '<div class="coach-notes">'+blockedRows.slice().reverse().map(rowHtml).join('')+'</div>';
+    }
+    if(recentAllowed.length){
+      html += '<p class="hint" style="margin-top:'+(blockedRows.length?'10px':'0')+';">'+(blockedRows.length?'Other, allowed searches:':'Allowed searches:')+'</p>';
+      html += '<div class="coach-notes">'+recentAllowed.map(rowHtml).join('')+'</div>';
+    }
+    if(olderAllowedCount > 0){
+      html += '<p class="hint">+'+olderAllowedCount+' more allowed '+(olderAllowedCount===1?'search':'searches')+' not shown.</p>';
+    }
+    body = html;
   }
-  if(!entries.length){
-    return '<div class="panel"><h3>Icon search activity</h3><p class="hint">No icon searches yet.</p></div>';
-  }
-  var rows = entries.slice().reverse().slice(0, 30).map(function(e){
-    return '<div class="coach-note"><div class="cn-meta">'+timeAgo(e.at)+(e.blocked?' · ⚠️ blocked':'')+'</div>'+esc(e.term)+'</div>';
-  }).join('');
-  return '<div class="panel"><h3>Icon search activity</h3><div class="coach-notes">'+rows+'</div></div>';
+  return '<div class="panel">'+head+body+'</div>';
 }
 function renderShellInboxDraft(){
   var d = state.inboxList.filter(function(x){return x.id===state.inboxSelectedId;})[0];
@@ -3256,7 +3306,7 @@ function renderShellInboxDraft(){
     renderReviewPreview(d, {coachNotes:true})+
     (d.coachMessage && d.coachMessage.trim()? ('<div class="panel"><h3>Message from '+esc(d.studentName)+'</h3><p style="font-size:13.5px; line-height:1.5;">'+esc(d.coachMessage)+'</p></div>') : '')+
     (d.coachNotes.length? ('<div class="panel"><h3>Previous notes</h3><div class="coach-notes">'+d.coachNotes.map(function(n){return '<div class="coach-note"><div class="cn-meta">'+timeAgo(n.at)+'</div>'+esc(n.text)+'</div>';}).join('')+'</div></div>') : '')+
-    iconSearchHistoryPanelHtml(d.studentName)+
+    iconSearchHistoryPanelHtml(d.studentName, d.id)+
     '<div class="panel">'+
       '<h3>Leave feedback for '+esc(d.studentName)+' <span id="coachFeedbackSaveIndicator" class="rail-save-indicator saved" style="text-transform:none; letter-spacing:0; font-family:inherit;"></span></h3>'+
       '<div class="field"><textarea id="coachFeedbackText" maxlength="1000" placeholder="What\'s working? What needs another pass? (Accepting sends this along as a congratulatory note.)">'+esc(d.coachDraftNote||'')+'</textarea></div>'+
@@ -4546,6 +4596,23 @@ function handleClick(e){
     if(!toggleGroupKey) return;
     inboxCollapsedGroups[toggleGroupKey] = !inboxCollapsedGroups[toggleGroupKey];
     saveInboxPref(INBOX_COLLAPSE_KEY, inboxCollapsedGroups);
+    render();
+    return;
+  }
+  if(action==='toggleIconSearchPanel'){
+    var panelDraftId = t.getAttribute('data-draftid');
+    if(!panelDraftId) return;
+    var currentlyOpen = state.iconSearchPanelOpen[panelDraftId];
+    if(currentlyOpen === undefined){
+      // First click ever on this draft: figure out what "open" currently
+      // means (the auto default) so toggling flips it, rather than assuming
+      // it was closed.
+      var u = normalizeUsername(state.inboxList.filter(function(x){return x.id===panelDraftId;})[0]?.studentName);
+      var cache = state.iconSearchHistoryByUser[u];
+      var hadBlocked = ((cache && cache.entries) || []).some(function(e){ return e.blocked; });
+      currentlyOpen = hadBlocked;
+    }
+    state.iconSearchPanelOpen[panelDraftId] = !currentlyOpen;
     render();
     return;
   }
