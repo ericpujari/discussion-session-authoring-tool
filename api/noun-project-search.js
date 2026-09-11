@@ -51,6 +51,8 @@
 const crypto = require('crypto');
 const OAuth = require('oauth-1.0a');
 const { createClient } = require('redis');
+const { isBlockedQuery, isBlockedIconResult, BLOCKLIST_WARNING } = require('../lib/icon-blocklist');
+const { recordSearchAttempt } = require('../lib/icon-search-history');
 
 const NOUN_PROJECT_ENDPOINT = 'https://api.thenounproject.com/v2/icon';
 const RESULT_LIMIT = 20;
@@ -179,11 +181,38 @@ module.exports = async (req, res) => {
   // What's actually sent to Noun Project and cached under — see stripLeadingArticle's
   // comment. The original `query` above is kept only for the empty-input check.
   const searchTerm = stripLeadingArticle(query);
+
+  // Who's searching and from where, for the history log below — best-effort,
+  // this endpoint has no auth so these are caller-supplied, not verified.
+  const username = typeof req.query.username === 'string' ? req.query.username.trim() : '';
+  const searchMode = typeof req.query.mode === 'string' ? req.query.mode : null;
+  const scenarioIndex = req.query.scenarioIndex != null ? Number(req.query.scenarioIndex) : null;
+  const optionIndex = req.query.optionIndex != null ? Number(req.query.optionIndex) : null;
+
+  if (isBlockedQuery(searchTerm)) {
+    // Awaited, not fire-and-forget — this is the safety-relevant record the
+    // whole feature exists for, so it should be at least as reliable as the
+    // response itself. No Noun Project call is made and no budget is spent.
+    await recordSearchAttempt(redis, username, {
+      term: query, blocked: true, mode: searchMode, scenarioIndex, optionIndex,
+    });
+    res.status(200).json({ results: [], blocked: true, message: BLOCKLIST_WARNING });
+    return;
+  }
+
   const cacheKey = CACHE_KEY_PREFIX + normalizeQuery(searchTerm);
   if (redis) {
     try {
       const cached = await redis.get(cacheKey);
       if (cached) {
+        // A cache hit is still a real search attempt for this student — the
+        // result was fetched fresh once, but not necessarily by them, so it
+        // must still be logged, or a popular term (this cache is shared
+        // across every student, per its own design above) would silently
+        // never appear in this student's history at all.
+        recordSearchAttempt(redis, username, {
+          term: query, blocked: false, mode: searchMode, scenarioIndex, optionIndex,
+        }).catch(() => {});
         res.status(200).json({ results: JSON.parse(cached) });
         return;
       }
@@ -236,7 +265,10 @@ module.exports = async (req, res) => {
   }
 
   const icons = Array.isArray(data.icons) ? data.icons : [];
-  const results = icons.map((icon) => ({
+  // Best-effort: only actually filters anything when Noun Project's response
+  // carries tag/term text per icon — see isBlockedIconResult's comment.
+  const safeIcons = icons.filter((icon) => !isBlockedIconResult(icon));
+  const results = safeIcons.map((icon) => ({
     id: icon.id,
     thumbnailUrl: icon.thumbnail_url || icon.preview_url || null,
     iconUrl: icon.icon_url || icon.thumbnail_url || null,
@@ -248,6 +280,12 @@ module.exports = async (req, res) => {
     redis.set(cacheKey, JSON.stringify(results), { EX: CACHE_TTL_SECONDS })
       .catch((e) => console.error('icon search cache write failed', e));
   }
+
+  // Fire-and-forget, same tradeoff as the cache write above — routine,
+  // non-blocking log of an allowed search.
+  recordSearchAttempt(redis, username, {
+    term: query, blocked: false, mode: searchMode, scenarioIndex, optionIndex,
+  }).catch(() => {});
 
   res.status(200).json({ results });
 };
