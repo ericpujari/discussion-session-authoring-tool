@@ -4667,6 +4667,7 @@ function handleClick(e){
       state.screen='coachLogin'; state.coachAuthError=''; state.coachAuthBusy=false; render(); return;
     }
     state.screen='inbox';
+    state.inboxLoading=true; // set before this render so the first paint shows "Loading…" instead of a false "No drafts yet"
     render();
     loadInbox();
     return;
@@ -4722,7 +4723,7 @@ function handleClick(e){
     state.coachAuthBusy=true; state.coachAuthError=''; render();
     window.storage.coachLogin(pw).then(function(){
       state.coachAuthBusy=false; state.coachAuthError='';
-      state.screen='inbox'; render();
+      state.screen='inbox'; state.inboxLoading=true; render(); // same "Loading…" fix as goInbox above
       loadInbox();
     }).catch(function(e){
       console.error('coach sign-in failed', e);
