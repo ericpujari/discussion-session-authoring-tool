@@ -51,8 +51,9 @@
 const crypto = require('crypto');
 const OAuth = require('oauth-1.0a');
 const { createClient } = require('redis');
-const { isBlockedQuery, isBlockedIconResult, BLOCKLIST_WARNING } = require('../lib/icon-blocklist');
+const { isBlockedQuery, isBlockedIconResult, buildBlocklistPattern, BLOCKLIST_WARNING } = require('../lib/icon-blocklist');
 const { recordSearchAttempt } = require('../lib/icon-search-history');
+const { loadCustomBlockedTerms } = require('../lib/icon-blocklist-store');
 
 const NOUN_PROJECT_ENDPOINT = 'https://api.thenounproject.com/v2/icon';
 const RESULT_LIMIT = 20;
@@ -189,7 +190,14 @@ module.exports = async (req, res) => {
   const scenarioIndex = req.query.scenarioIndex != null ? Number(req.query.scenarioIndex) : null;
   const optionIndex = req.query.optionIndex != null ? Number(req.query.optionIndex) : null;
 
-  if (isBlockedQuery(searchTerm)) {
+  // Fetched fresh on every request (not cached in-process) so a word a coach
+  // just blocked from the "Icon search activity" panel takes effect on the
+  // very next search, no redeploy needed. Fails open to the static list only
+  // if Redis is unreachable — see loadCustomBlockedTerms.
+  const customTerms = await loadCustomBlockedTerms(redis);
+  const blocklistPattern = buildBlocklistPattern(customTerms);
+
+  if (isBlockedQuery(searchTerm, blocklistPattern)) {
     // Awaited, not fire-and-forget — this is the safety-relevant record the
     // whole feature exists for, so it should be at least as reliable as the
     // response itself. No Noun Project call is made and no budget is spent.
@@ -267,7 +275,7 @@ module.exports = async (req, res) => {
   const icons = Array.isArray(data.icons) ? data.icons : [];
   // Best-effort: only actually filters anything when Noun Project's response
   // carries tag/term text per icon — see isBlockedIconResult's comment.
-  const safeIcons = icons.filter((icon) => !isBlockedIconResult(icon));
+  const safeIcons = icons.filter((icon) => !isBlockedIconResult(icon, blocklistPattern));
   const results = safeIcons.map((icon) => ({
     id: icon.id,
     thumbnailUrl: icon.thumbnail_url || icon.preview_url || null,

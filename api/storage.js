@@ -46,6 +46,7 @@
 
 const { createClient } = require('redis');
 const crypto = require('crypto');
+const { addCustomBlockedTerm } = require('../lib/icon-blocklist-store');
 
 // ---- Coach authentication --------------------------------------------------
 // One shared password (COACH_PASSWORD) gates the coach-only operations. The
@@ -358,6 +359,24 @@ module.exports = async (req, res) => {
     }
   }
 
+  // iconblocklist:custom is a shared resource that affects every student's
+  // icon search, not one student's own data — unlike everything else here it
+  // can't rely on the app's normal student/coach split, which is opt-in via
+  // STUDENT_LINKS_REQUIRED and off by default. Gated coach-only unconditionally,
+  // the same way `list` is above, regardless of that setting.
+  if (op === 'blockIconTerm' || key === 'iconblocklist:custom') {
+    if (!process.env.COACH_PASSWORD) {
+      res.status(500).json({
+        error: 'Coach access is not configured. Set COACH_PASSWORD in the Vercel project settings and redeploy.',
+      });
+      return;
+    }
+    if (!verifyToken(req.headers[COACH_TOKEN_HEADER])) {
+      res.status(401).json({ error: 'Coach sign-in required.', reason: 'coach' });
+      return;
+    }
+  }
+
   const isCoach = verifyToken(req.headers[COACH_TOKEN_HEADER]);
   const linksRequired = studentLinksRequired();
   const studentOwner = verifyStudentToken(req.headers[STUDENT_TOKEN_HEADER]);
@@ -417,6 +436,20 @@ module.exports = async (req, res) => {
     if (op === 'delete') {
       await redis.del(key);
       res.status(200).json({ ok: true });
+      return;
+    }
+
+    // Read-modify-write happens server-side in one request (see
+    // lib/icon-blocklist-store.js) rather than making the client fetch, edit,
+    // and set the raw JSON itself — smaller race window, and the client never
+    // needs to know that record's shape.
+    if (op === 'blockIconTerm') {
+      const result = await addCustomBlockedTerm(redis, body.term);
+      if (!result.ok) {
+        res.status(400).json({ error: result.error || 'Could not block that word.' });
+        return;
+      }
+      res.status(200).json({ ok: true, terms: result.terms });
       return;
     }
 
